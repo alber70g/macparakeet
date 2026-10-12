@@ -96,6 +96,9 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
 
 ### Changed
 
+- Inline Anthropic and OpenRouter LLM commands now default to Claude Sonnet 5.5
+  (`claude-sonnet-5-5` and `anthropic/claude-sonnet-5.5`). Pass `--model` to
+  keep a previous model. The `--model` help example references the same ID.
 - FluidAudio 0.17.7. Explicit `--speaker-count`, `--speaker-min` and
   `--speaker-max` runs (Community-1) no longer over-split audio that contains
   digital silence, such as a muted call track. Automatic speaker detection
