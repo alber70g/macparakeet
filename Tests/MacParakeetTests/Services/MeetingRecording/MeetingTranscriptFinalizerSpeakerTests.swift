@@ -116,6 +116,22 @@ final class MeetingTranscriptFinalizerSpeakerTests: XCTestCase {
         XCTAssertEqual(SpeakerInfo.participants(in: renamed).count, 3)
     }
 
+    /// Merging every cluster into a manual speaker removes the `system:` ids;
+    /// the bucket must still not count as a person.
+    func testUnattributedBucketStaysUncountedAfterLastClusterIsMerged() {
+        let merged = [
+            SpeakerInfo(id: "microphone", label: "Me"),
+            SpeakerInfo(id: "system", label: "Unattributed"),
+            SpeakerInfo(id: "user:6F9619FF-8B86-D011-B42D-00CF4FC964FF", label: "Dana"),
+        ]
+        XCTAssertEqual(SpeakerInfo.participants(in: merged).map(\.label), ["Me", "Dana"])
+
+        // Without diarization, `Others` beside a manual speaker is still everyone else.
+        var undiarized = merged
+        undiarized[1].label = "Others"
+        XCTAssertEqual(SpeakerInfo.participants(in: undiarized).count, 3)
+    }
+
     private func finalize(
         microphoneWords: [TimestampedWord] = [],
         systemWords: [TimestampedWord],
