@@ -1039,6 +1039,12 @@ public final class HotkeyManager {
                 capsLockChangedWhileTapWasDisabled
                 && (targetModifierGestureIsActive || gestureController.hasPendingTriggerPress)
             reconcilePassiveFnKeyState()
+            // A peer key pressed while the tap was down is still peer input.
+            if ownsHeldTake {
+                claimedPeerKeyCodes.formUnion(
+                    pressedNonFnKeyCodes.filter { peerInput.claimsKey($0, flags: currentFlags.rawValue) }
+                )
+            }
             if triggerPressed,
                 passiveFnInputIsContaminated(flags: currentFlags)
                     || capsLockContaminatesCurrentGesture

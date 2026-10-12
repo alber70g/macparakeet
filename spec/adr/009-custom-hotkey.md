@@ -129,7 +129,7 @@ blocked instead of installing duplicate listeners, as are chords on one terminal
 key between the additional pair and the primary pair or AI polish. The existing
 coordinator plans and owns all managers; no second dictation engine or capture
 flow is added.
-Hold-to-talk restoration is restricted to its owning trigger, input from the
+Hold-to-talk restoration is restricted to its owning trigger; input from the
 other accepted shortcuts does not interrupt a held take, while either
 ordinary hands-free shortcut can stop a persistent take. AI-polish remains a
 separate invocation policy. See `spec/contracts/dictation-shortcuts.md`.

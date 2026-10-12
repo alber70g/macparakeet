@@ -309,7 +309,9 @@ final class AppHotkeyCoordinator {
         }
 
         let activeRecordingMode = dictationRecordingModeProvider()
-        if activeRecordingMode == nil {
+        if activeRecordingMode == nil
+            || !Self.heldOwnerSurvivesRefresh(activeDictationHotkey, activeMode: activeRecordingMode, in: plan)
+        {
             activeDictationHotkey = nil
         }
         let entries: [(spec: DictationHotkeyPlan.Spec, manager: HotkeyManager)] = plan.specs.compactMap { spec in
@@ -604,6 +606,18 @@ final class AppHotkeyCoordinator {
             return spec.trigger == activeHotkey.trigger && spec.aiFormatterEnabled == activeHotkey.aiFormatterEnabled
         }
         return spec.aiFormatterEnabled == activeHotkey.aiFormatterEnabled
+    }
+
+    /// A held take's shortcut can be rebound mid-take. With its trigger gone,
+    /// no manager would match the owner and the take could not be stopped, so
+    /// the caller drops ownership and lets role matching resume the take.
+    static func heldOwnerSurvivesRefresh(
+        _ owner: DictationHotkeyPlan.Spec?,
+        activeMode: FnKeyStateMachine.RecordingMode?,
+        in plan: DictationHotkeyPlan
+    ) -> Bool {
+        guard activeMode == .holdToTalk, let owner else { return true }
+        return plan.specs.contains { $0.trigger == owner.trigger }
     }
 
     func syncDictationHotkeyRecordingMode(_ mode: FnKeyStateMachine.RecordingMode) {

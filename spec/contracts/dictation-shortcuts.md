@@ -91,7 +91,8 @@ and that one shortcut's use never silently ends another's take.
 - One manager dispatches Escape effects across all dictation taps, preserving the
   cancellation Undo window. Other managers clear a pending first press and its
   timers but leave live-take and cancel-window state unchanged on Escape, so
-  they stay blocked until the flow resets them. Escape always executes.
+  they stay blocked until the flow resets them. Escape is never consumed, so it
+  still reaches the front app whether or not it cancels.
 - Discarding a provisional hold take (quick tap or interrupting key) releases
   the other taps that the start suppressed; the discarding tap keeps its
   second-tap window.

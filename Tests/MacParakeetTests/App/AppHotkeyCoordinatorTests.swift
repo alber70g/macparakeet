@@ -937,6 +937,26 @@ final class AppHotkeyCoordinatorTests: XCTestCase {
             AppHotkeyCoordinator.shouldResumeDictationHotkey(replacement, activeMode: .holdToTalk, activeHotkey: old))
     }
 
+    func testReboundHeldShortcutFallsBackToRoleMatchingSoTheTakeCanStop() {
+        let delete = HotkeyTrigger.fromKeyCode(51)
+        let old = AppHotkeyCoordinator.DictationHotkeyPlan.Spec(trigger: delete, gestureMode: .holdOnly)
+        let rebound = AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .disabled, pushToTalk: .fn)
+        XCTAssertFalse(
+            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(old, activeMode: .holdToTalk, in: rebound))
+        let replacement = rebound.specs[0]
+        XCTAssertFalse(
+            AppHotkeyCoordinator.shouldResumeDictationHotkey(replacement, activeMode: .holdToTalk, activeHotkey: old))
+        XCTAssertTrue(
+            AppHotkeyCoordinator.shouldResumeDictationHotkey(replacement, activeMode: .holdToTalk, activeHotkey: nil))
+
+        let unchanged = AppHotkeyCoordinator.dictationHotkeyPlan(
+            handsFree: .disabled, pushToTalk: delete, alternatePushToTalk: .fn)
+        XCTAssertTrue(
+            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(old, activeMode: .holdToTalk, in: unchanged))
+        XCTAssertTrue(
+            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(old, activeMode: .persistent, in: rebound))
+    }
+
     func testEscapeClearsPendingGestureOnNonDispatchingManager() {
         let manager = HotkeyManager(trigger: .option, gestureMode: .holdOnly)
         manager.shouldDispatchEscape = { false }
@@ -1513,6 +1533,24 @@ final class AppHotkeyCoordinatorTests: XCTestCase {
                 XCTAssertEqual(rig.recorder.pendingStops, 1, "Owner release must stop, not cancel: \(rig.label)")
                 XCTAssertEqual(rig.recorder.killedTakes, 0, rig.label)
             }
+        }
+    }
+
+    func testTapRecoveryClaimsAPeerKeyPressedWhileTheTapWasDown() {
+        let scenario = PeerScenario(
+            name: "Fn owner, standalone key peer pressed during outage", owner: .fn, peer: .fromKeyCode(117),
+            ownerPress: [.modifier(63, Self.fn)], peerInput: [],
+            ownerRelease: [.modifier(63, [])])
+        forEachPeerRig([scenario], variants: [.provisional, .confirmed]) { rig in
+            rig.startHeldTake()
+            rig.owner.setPhysicalKeyStateProviderForTesting { $0 == 117 }
+            rig.owner.recoverFromDisabledTapForTesting(flags: Self.fn, triggerKeyPressed: false)
+            XCTAssertEqual(rig.recorder.killedTakes, 0, "Recovery killed the take: \(rig.label)")
+
+            rig.send([.up(117, Self.fn)])
+            rig.releaseOwnerAfterTapThreshold()
+            XCTAssertEqual(rig.recorder.pendingStops, 1, "Owner release must stop, not cancel: \(rig.label)")
+            XCTAssertEqual(rig.recorder.killedTakes, 0, rig.label)
         }
     }
 
