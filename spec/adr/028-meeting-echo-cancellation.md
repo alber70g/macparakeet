@@ -80,6 +80,14 @@ Render skip (echo probe, PR #676):
   `spec/contracts/meeting-artifacts-v1.md`, so shared artifact folders
   self-describe cleaned-vs-raw routing without app logs.
 
+Memory/storage implementation (October 2026): sequential decode writes private,
+immediately unlinked PCM scratch files; the unchanged echo probe reads bounded
+ranges and conditioned samples are encoded incrementally. This removes
+recording-length PCM arrays from the renderer without changing model choice or
+quality policy. It trades temporary disk I/O (about 220 MiB/hour/source) for a
+bounded in-process sample working set. Scratch failure preserves raw sources and
+uses the existing observable fallback; no new durable artifact is introduced.
+
 The cleaned mic is exposed in the artifact manifest
 (`cleanedMicrophoneAudioPath`, `spec/contracts/meeting-artifacts-v1.md`).
 
