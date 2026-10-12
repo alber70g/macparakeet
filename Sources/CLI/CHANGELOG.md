@@ -94,6 +94,13 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
 
 ## [Unreleased]
 
+## [5.1.0] — 2026-10-12 (bundled with MacParakeet 0.8.10)
+
+Omitting `--model` on inline Anthropic and OpenRouter commands now selects
+Claude Sonnet 5.5. Pass `--model` to keep a previous id. JSON fields and exit
+codes are unchanged, so this stays a minor release. The standalone Homebrew CLI
+has its own release channel.
+
 ### Changed
 
 - Inline Anthropic and OpenRouter LLM commands now default to Claude Sonnet 5.5
