@@ -384,6 +384,48 @@ final class TranscriptionViewModelBatchTests: XCTestCase {
         XCTAssertNil(vm.currentTranscription, "Batch is ambient — no per-file presentation")
     }
 
+    func testExactNextRunSpeakerCountAppliesToEveryFileInTheBatch() async throws {
+        let vm = makeViewModel()
+        vm.nextRunSpeakerSelection = .exact(2)
+
+        let urls = [try touch("c.mp3"), try touch("a.mp3"), try touch("b.mp3")]
+        XCTAssertTrue(vm.transcribeFiles(urls: urls))
+        try await waitUntil { !vm.isDiscoveringFiles }
+        XCTAssertEqual(vm.nextRunSpeakerSelection, .automatic)
+        try await waitUntil { !vm.isBatchActive }
+
+        let selections = await mockService.transcriptionSpeakerSelections
+        let order = await mockService.transcribedFileNames
+        XCTAssertEqual(selections, [.exact(2), .exact(2), .exact(2)])
+        XCTAssertEqual(order, ["a.mp3", "b.mp3", "c.mp3"])
+    }
+
+    func testExactNextRunSpeakerCountKeepsSelectedAudioTrack() async throws {
+        let url = try touch("panel.mkv")
+        let tracks = [
+            AudioTrackDescriptor(ordinal: 0, streamIndex: 1, languageCode: "jpn", isDefault: true),
+            AudioTrackDescriptor(ordinal: 1, streamIndex: 2, languageCode: "eng"),
+        ]
+        let trackService = MockAudioTrackSelectionService(
+            base: mockService,
+            tracksByFileName: ["panel.mkv": tracks]
+        )
+        let vm = makeViewModel(audioTrackService: trackService)
+        vm.nextRunSpeakerSelection = .exact(3)
+
+        vm.transcribeFile(url: url)
+        try await waitUntil { vm.pendingAudioTrackSelection != nil }
+        XCTAssertEqual(vm.nextRunSpeakerSelection, .exact(3), "Not consumed until a run starts")
+        vm.selectAudioTrack(ordinal: 1)
+        try await waitUntil { !vm.isTranscribing }
+
+        let selections = await mockService.transcriptionSpeakerSelections
+        let ordinals = await mockService.transcriptionSpeakerAudioTrackOrdinals
+        XCTAssertEqual(selections, [.exact(3)])
+        XCTAssertEqual(ordinals, [1])
+        XCTAssertEqual(vm.nextRunSpeakerSelection, .automatic)
+    }
+
     // MARK: - Failure continues the batch
 
     func testFailedFileDoesNotAbortBatch() async throws {
