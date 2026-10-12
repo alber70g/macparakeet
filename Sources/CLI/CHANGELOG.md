@@ -107,6 +107,8 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
   continues to preserve notes preferences. No JSON schema changes (#1204).
 - Prompt-result context limiting reserves transcript space before bounding
   oversized notes or system context, including LM Studio's smaller limit.
+- Transform shortcut assignment rejects collisions with either additional dictation
+  shortcut configured in the app. Existing error/output schemas are unchanged.
 
 ### Fixed
 
