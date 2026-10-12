@@ -247,7 +247,7 @@ public final class LLMSettingsViewModel {
         didSet {
             guard cleanupOverrideProviderID != oldValue else { return }
             cleanupModelName = cleanupOverrideProviderID?.defaultModelName ?? ""
-            refreshTaskCredentialAccess()
+            if !isLoadingTaskOverrides { refreshTaskCredentialAccess() }
         }
     }
     public var cleanupModelName = ""
@@ -255,10 +255,12 @@ public final class LLMSettingsViewModel {
         didSet {
             guard analysisOverrideProviderID != oldValue else { return }
             analysisModelName = analysisOverrideProviderID?.defaultModelName ?? ""
-            refreshTaskCredentialAccess()
+            if !isLoadingTaskOverrides { refreshTaskCredentialAccess() }
         }
     }
     public var analysisModelName = ""
+    /// Batches the Keychain check while `loadTaskOverrides()` reassigns both routes.
+    private var isLoadingTaskOverrides = false
 
     public var apiKeyInput: String {
         get { draft.apiKeyInput }
@@ -1482,14 +1484,9 @@ public final class LLMSettingsViewModel {
 
     private func loadExistingConfig() {
         draftCredentialAccessError = nil
-        let loaded: LLMProviderConfig?
-        do { loaded = try configStore?.loadConfig() } catch {
-            // A locked/denied key is not a missing route. Preserve the saved setup.
-            draftCredentialAccessError = error.localizedDescription
-            loaded = try? configStore?.loadConfigMetadata()
-        }
-        guard let config = loaded else {
-            draftCredentialAccessError = nil
+        // Read metadata and the key separately so only Keychain failures become
+        // credential errors. A locked/denied key is not a missing route.
+        guard let metadata = try? configStore?.loadConfigMetadata() else {
             draftStoredAPIKey = ""
             draft = LLMSettingsDraft(
                 aiFormatterPrompt: Self.loadStoredAIFormatterPrompt(from: defaults),
@@ -1501,6 +1498,10 @@ public final class LLMSettingsViewModel {
             loadTaskOverrides()
             return
         }
+        let apiKey = savedAPIKey(for: metadata.id)
+        let config = LLMProviderConfig(
+            id: metadata.id, baseURL: metadata.baseURL, apiKey: apiKey.isEmpty ? nil : apiKey,
+            modelName: metadata.modelName, isLocal: metadata.isLocal)
         let cliConfig = config.id == .localCLI ? cliConfigStore?.load() : nil
         loadCommittedDraft(config, cliConfig: cliConfig, suggestedModels: Self.suggestedModels(for: config.id))
         if Self.usesDiscoveredModelList(config.id) {
@@ -1514,6 +1515,8 @@ public final class LLMSettingsViewModel {
     }
 
     private func loadTaskOverrides() {
+        isLoadingTaskOverrides = true
+        defer { isLoadingTaskOverrides = false }
         cleanupOverrideProviderID = nil
         cleanupModelName = ""
         analysisOverrideProviderID = nil

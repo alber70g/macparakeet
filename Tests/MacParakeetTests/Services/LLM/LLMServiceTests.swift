@@ -194,12 +194,23 @@ final class MockLLMExecutionContextResolver: LLMExecutionContextResolving, @unch
 }
 
 final class MockLLMConfigStore: LLMConfigStoreProtocol, @unchecked Sendable {
-    var config: LLMProviderConfig?
+    /// Like the real store, a configured key is also the saved provider key.
+    var config: LLMProviderConfig? {
+        didSet {
+            if let config, let key = config.apiKey { storedKeys[config.id] = key }
+        }
+    }
     /// Per-provider key storage for testing provider switching.
     var storedKeys: [LLMProviderID: String] = [:]
     var taskOverrides: [LLMTaskGroup: LLMProviderConfig] = [:]
 
-    func loadConfig() throws -> LLMProviderConfig? { config }
+    /// Simulates a route-store failure, such as a busy lease, before any key read.
+    var loadConfigError: Error?
+
+    func loadConfig() throws -> LLMProviderConfig? {
+        if let loadConfigError { throw loadConfigError }
+        return config
+    }
     func saveConfig(_ config: LLMProviderConfig) throws {
         self.config = config
         if let key = config.apiKey {

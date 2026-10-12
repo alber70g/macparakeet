@@ -1021,7 +1021,7 @@ final class PromptsViewModelTests: XCTestCase {
         viewModel.newContent = "Rewrite."
         viewModel.newInferenceSettings.temperature = "1.5"
         viewModel.addPrompt()
-        XCTAssertFalse(viewModel.prompts.contains { $0.name == "Blocked transform" })
+        XCTAssertFalse(viewModel.managedPrompts.contains { $0.name == "Blocked transform" })
         XCTAssertEqual(viewModel.newInferenceValidationErrors[.temperature], "Enter a number from 0 to 1.")
         XCTAssertEqual(client.listModelsCallCount, 0)
     }

@@ -66,7 +66,7 @@ previous routes active.
 Route metadata is refreshed and read or written under a shared nonblocking
 cross-process lease. Mutations acquire it before changing credentials and keep
 it through metadata publication; competing operations fail busy without changes,
-including while another credential operation is in progress. Effective-route resolution uses one metadata snapshot before loading the
+including while another mutation is writing credentials. Effective-route resolution uses one metadata snapshot before loading the
 selected provider's credentials outside that lock. Model pickers compare their
 displayed route and inheritance identity as part of the same store operation
 that changes the model, so a simultaneous CLI route change cannot redirect a

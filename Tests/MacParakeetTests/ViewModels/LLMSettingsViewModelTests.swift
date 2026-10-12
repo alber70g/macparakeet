@@ -50,6 +50,34 @@ final class LLMSettingsViewModelTests: XCTestCase {
         XCTAssertEqual(try store.loadConfigMetadata()?.id, .openai)
     }
 
+    func testRouteStoreFailureIsNotReportedAsCredentialError() {
+        mockConfigStore.config = .openai(apiKey: "saved-key")
+        mockConfigStore.loadConfigError = LLMConfigStore.StoreError.busy
+
+        viewModel.configure(configStore: mockConfigStore, llmClient: mockClient)
+
+        XCTAssertEqual(viewModel.selectedProviderID, .openai)
+        XCTAssertEqual(viewModel.apiKeyInput, "saved-key")
+        XCTAssertNil(viewModel.credentialAccessError)
+    }
+
+    func testLoadingTaskOverridesChecksEachCredentialOnce() throws {
+        let credentials = InMemoryKeyValueStore()
+        let store = LLMConfigStore(
+            preferencesDomain: defaultsSuiteName, lockURL: routeLockURL, keychain: credentials)
+        try store.saveTaskOverride(.gemini(apiKey: "gemini-key"), for: .cleanup)
+        try store.saveTaskOverride(.anthropic(apiKey: "anthropic-key"), for: .analysis)
+        try store.saveConfiguration(
+            .openai(apiKey: "saved-key"), cleanupOverride: .gemini(apiKey: "gemini-key"),
+            analysisOverride: .anthropic(apiKey: "anthropic-key"))
+        let readsBefore = credentials.readCount
+
+        viewModel.configure(configStore: store, llmClient: mockClient)
+
+        // One read for the default key, then one per override provider.
+        XCTAssertEqual(credentials.readCount - readsBefore, 3)
+    }
+
     func testStatusRenderingDoesNotReadSavedCredentials() throws {
         let credentials = InMemoryKeyValueStore()
         let store = LLMConfigStore(
@@ -820,7 +848,8 @@ final class LLMSettingsViewModelTests: XCTestCase {
         viewModel.clearConfiguration()
 
         XCTAssertNil(mockConfigStore.config)
-        XCTAssertEqual(viewModel.apiKeyInput, "")
+        // Turning AI off keeps the saved provider key for reselection.
+        XCTAssertEqual(viewModel.apiKeyInput, "sk-test")
         XCTAssertEqual(viewModel.connectionTestState, .idle)
         XCTAssertFalse(viewModel.isConfigured)
     }
