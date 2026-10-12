@@ -8,13 +8,11 @@ import MacParakeetCore
 /// processing happens later on the main thread from a forwarded snapshot.
 struct HotkeyTapFilter {
     private let trigger: HotkeyTrigger
-    private let requiredChordFlags: UInt64
     /// Chord triggers: the trigger keyDown was consumed, so its keyUp is too.
     private var consumedChordKeyDown = false
 
     init(trigger: HotkeyTrigger) {
         self.trigger = trigger
-        self.requiredChordFlags = trigger.chordEventFlags
     }
 
     /// `flags` are the event's raw flags; only the chord modifier bits matter.
@@ -27,10 +25,10 @@ struct HotkeyTapFilter {
         case .chord:
             switch type {
             case .keyDown:
-                // Superset match: tolerates the phantom Fn bit on F-keys.
-                let matches = flags & HotkeyTrigger.relevantModifierBits & requiredChordFlags
-                    == requiredChordFlags
-                // An unconsumed keyDown reaches the app, so its keyUp must too.
+                // Exact chord match, ignoring only the phantom Fn bit on
+                // function-family keys. An unconsumed keyDown reaches the app,
+                // so its keyUp must too.
+                let matches = trigger.chordEventMatches(flags: flags)
                 consumedChordKeyDown = matches
                 return matches
             case .keyUp:

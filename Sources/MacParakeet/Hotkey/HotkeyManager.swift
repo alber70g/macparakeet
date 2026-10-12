@@ -741,8 +741,8 @@ public final class HotkeyManager {
 
         if type == .keyDown {
             if keyCode == triggerCode {
-                // Check required modifiers are held
-                guard flags & requiredChordFlags == requiredChordFlags else {
+                // Exact configured modifiers. Extra real modifiers pass through.
+                guard trigger.chordEventMatches(flags: flags) else {
                     return gestureController.interrupted()
                 }
 
