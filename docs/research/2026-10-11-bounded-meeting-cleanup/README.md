@@ -96,4 +96,6 @@ The script creates and removes only its own temporary build and synthetic audio.
 Allow roughly 440 MiB/hour for two input CAFs plus another 440 MiB/hour for candidate
 scratch (not counting filesystem caches or the encoded output). The harness now
 also prints a streaming SHA-256 of decoded AAC output for cross-arm parity;
-initial footprint logs predate that added digest pass.
+initial footprint logs predate that added digest pass. The harness exits non-zero
+if the echo fixture skips, or if the no-echo fixture renders or skips for any reason
+other than `noEchoPath` with `no_reference_energy`.

@@ -5,6 +5,7 @@ import CryptoKit
 // Adjacent app metadata/error types are stubbed; both renderers and their DSP,
 // codec adapter and scratch implementation below are actual repository source.
 enum MeetingAudioError: Error { case storageFailed(String) }
+enum HarnessError: Error { case unexpectedOutcome(String) }
 enum MeetingArtifactAudioFileNames { static let cleanedMicrophone = "microphone-cleaned.m4a" }
 struct MeetingSourceAlignment {
     struct Source { let startOffsetMs: Int }
@@ -35,29 +36,60 @@ final class ProbeConditioner: MicConditioning, @unchecked Sendable {
         try makeSource(microphone, seconds: seconds, scale: 0.5)
         try makeSource(system, seconds: seconds, scale: noEcho ? 0 : 1)
         let start = ContinuousClock.now
+        let observed: Observed
         if mode == "baseline" {
             let result = try await BaselineCleanedMicRenderer().render(
                 microphoneURL: microphone, systemURL: system, sourceAlignment: .init(),
                 outputURL: directory.appendingPathComponent("out.m4a"), conditioner: ProbeConditioner())
             switch result {
-            case .rendered(let result): print("rendered seconds=\(result.durationSeconds) ratio=\(result.outputToRawRmsRatio) probe=\(result.echoProbe)")
-            case .skipped(let reason): print("skipped \(reason)")
+            case .rendered(let result):
+                observed = Observed(
+                    line: "rendered seconds=\(result.durationSeconds) ratio=\(result.outputToRawRmsRatio) probe=\(result.echoProbe)",
+                    rendered: true, noEchoDetail: nil)
+            case .skipped(let reason):
+                var detail: String?
+                if case .noEchoPath(let probe) = reason { detail = probe.detail }
+                observed = Observed(line: "skipped \(reason)", rendered: false, noEchoDetail: detail)
             }
         } else {
             let result = try await MeetingCleanedMicRenderer().render(
                 microphoneURL: microphone, systemURL: system, sourceAlignment: .init(),
                 outputURL: directory.appendingPathComponent("out.m4a"), conditioner: ProbeConditioner())
             switch result {
-            case .rendered(let result): print("rendered seconds=\(result.durationSeconds) ratio=\(result.outputToRawRmsRatio) probe=\(result.echoProbe)")
-            case .skipped(let reason): print("skipped \(reason)")
+            case .rendered(let result):
+                observed = Observed(
+                    line: "rendered seconds=\(result.durationSeconds) ratio=\(result.outputToRawRmsRatio) probe=\(result.echoProbe)",
+                    rendered: true, noEchoDetail: nil)
+            case .skipped(let reason):
+                var detail: String?
+                if case .noEchoPath(let probe) = reason { detail = probe.detail }
+                observed = Observed(line: "skipped \(reason)", rendered: false, noEchoDetail: detail)
             }
         }
+        print(observed.line)
         let elapsed = start.duration(to: .now)
         let output = directory.appendingPathComponent("out.m4a")
         if FileManager.default.fileExists(atPath: output.path) {
             try printDigest(output)
         }
         print("mode=\(mode) input_seconds=\(seconds) no_echo=\(noEcho) render_elapsed=\(elapsed)")
+        try observed.requireExpected(noEcho: noEcho)
+    }
+    struct Observed {
+        let line: String
+        let rendered: Bool
+        let noEchoDetail: String?
+        func requireExpected(noEcho: Bool) throws {
+            if noEcho {
+                guard !rendered, noEchoDetail == "no_reference_energy" else {
+                    throw HarnessError.unexpectedOutcome("no-echo fixture expected noEchoPath/no_reference_energy, got: \(line)")
+                }
+            } else {
+                guard rendered else {
+                    throw HarnessError.unexpectedOutcome("echo fixture expected a rendered output, got: \(line)")
+                }
+            }
+        }
     }
     static func printDigest(_ url: URL) throws {
         let file = try AVAudioFile(forReading: url)
