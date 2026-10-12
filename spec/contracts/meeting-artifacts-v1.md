@@ -112,6 +112,10 @@ The v1 folder can contain these stable filenames:
   Absent for single-source meetings, missing/unloaded AEC assets, render
   failures, and when the echo-path probe finds no system-audio bleed to cancel.
   Removed with the other managed audio by retention/detach.
+  Renderer PCM scratch is never a folder entry (see
+  `spec/05-audio-pipeline.md`). Scratch or encode failure preserves raw sources
+  and uses the existing skip/fallback provenance; incomplete derived output is
+  removed on encoding failure or cooperative cancellation.
 - `meeting-recording-metadata.json`: optional source-alignment and speech-route
   sidecar. `speechEngine` is the authoritative final-transcription selection;
   optional additive `previewSpeechEngine` records the live-preview route when

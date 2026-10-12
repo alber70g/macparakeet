@@ -335,6 +335,14 @@ estimation. Before running the model, the echo probe can skip no-echo meetings
 cleaned file. For very long meetings, the duration guard skips upfront when the
 render is predicted to exceed the bounded final-STT deadline.
 
+Decoded PCM is spooled sequentially to private, immediately unlinked temporary
+files. The echo probe reads bounded windows; conditioning and AAC encoding pull
+bounded chunks instead of retaining whole recordings in RAM. Sample alignment,
+probe thresholds, conditioner cadence and output duration are unchanged. Temporary
+storage is roughly 220 MiB per hour per source at 16 kHz mono Float32; descriptors
+release it on completion, cancellation, failure or process exit. Scratch I/O
+failure follows the existing observable raw-microphone fallback.
+
 Final STT waits on `MeetingCleanedMicrophoneReadiness` with a bounded,
 duration-scaled deadline before choosing the microphone source. It uses cleaned
 audio only when the render finishes and the artifact is non-empty and decodable;
