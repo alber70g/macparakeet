@@ -1510,6 +1510,7 @@ This extension is not implemented; the checked criteria below describe the exist
 - Speaker colors in transcript view (visual differentiation)
 - Per-speaker analytics: speaking time, word count
 - On by default where supported for file/URL transcription and meeting finalization with a system-audio track; the Settings toggle remains available, and the CLI follows the saved preference — `--speaker-detection off` / `--no-diarize` forces it off, while speaker-count constraints keep forcing it on for that run
+- Optional exact speaker count before a file or link transcription ([#1225](https://github.com/moona3k/macparakeet/issues/1225)): while file/URL speaker detection is on, the Transcribe view shows **Speakers: Auto**. Choosing 1–12 applies to the next drop, file pick, or link only (every file in that batch), then resets to Auto. A YouTube video already in the Library is transcribed again instead of reused, so the count takes effect. An exact count uses the Community-1 constrained path, like Re-transcribe; meetings keep their calendar prior and use Re-transcribe for an exact count
 
 **Transcript with speakers:**
 
@@ -1579,6 +1580,7 @@ are unaffected.
 - [x] Diarization failure is non-fatal (ASR result preserved)
 - [x] Progress shows "Identifying speakers..." headline
 - [x] Settings toggles for file/URL and meeting speaker detection (on by default where supported; explicit off is preserved)
+- [x] Transcribe view offers a one-run exact speaker count (1–12) for the next file, batch, or link; hidden while file/URL speaker detection is off
 - [x] CLI: `macparakeet-cli transcribe` follows the saved file/URL speaker-detection preference; meeting retranscription follows the saved meeting speaker-detection preference when app-default; `--speaker-detection off` / `--no-diarize` force off per run, and speaker-count constraints force on
 
 **Timed transcript corrections (shipping in stable 0.8.7):**

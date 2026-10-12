@@ -80,7 +80,7 @@ private struct RetranscriptionConfirmation: Identifiable {
     let id = UUID()
     let transcriptionID: UUID
     let speechEngineOverride: SpeechEngineSelection?
-    let speakerSelection: RetranscriptionSpeakerSelection?
+    let speakerSelection: SpeakerCountSelection?
     let countsOtherSpeakers: Bool
     let resetsSpeakerCorrections: Bool
     let purpose: Purpose
@@ -88,7 +88,7 @@ private struct RetranscriptionConfirmation: Identifiable {
     init(
         transcriptionID: UUID,
         speechEngineOverride: SpeechEngineSelection?,
-        speakerSelection: RetranscriptionSpeakerSelection?,
+        speakerSelection: SpeakerCountSelection?,
         countsOtherSpeakers: Bool,
         resetsSpeakerCorrections: Bool,
         purpose: Purpose = .standard
@@ -436,7 +436,7 @@ final class TranscriptNotesActionGate {
 private struct RetranscribePick: Sendable {
     let transcriptionID: UUID
     let override: SpeechEngineSelection?
-    let speakerSelection: RetranscriptionSpeakerSelection?
+    let speakerSelection: SpeakerCountSelection?
     let countsOtherSpeakers: Bool
 }
 
@@ -547,7 +547,7 @@ struct TranscriptResultView: View {
     var meetingSplitViewModel: MeetingSplitViewModel? = nil
     var onBack: (() -> Void)?
     var onStartNew: (() -> Void)?
-    var onRetranscribe: ((Transcription, SpeechEngineSelection?, RetranscriptionSpeakerSelection?) -> Void)?
+    var onRetranscribe: ((Transcription, SpeechEngineSelection?, SpeakerCountSelection?) -> Void)?
     var onSetUpAI: (() -> Void)?
 
     @AppStorage(UserDefaultsAppRuntimePreferences.transcriptAIContextModeKey)
@@ -1252,8 +1252,8 @@ struct TranscriptResultView: View {
                         if engineOption != nil || canConfigureSpeakers {
                             selectedRetranscriptionSpeechEngineOverride = nil
                             retranscriptionExactSpeakerCount = min(
-                                max(defaultRetranscriptionSpeakerCount, RetranscriptionSpeakerSelection.supportedExactCount.lowerBound),
-                                RetranscriptionSpeakerSelection.supportedExactCount.upperBound
+                                max(defaultRetranscriptionSpeakerCount, SpeakerCountSelection.supportedExactCount.lowerBound),
+                                SpeakerCountSelection.supportedExactCount.upperBound
                             )
                             showingRetranscribeOptions.toggle()
                         } else {
@@ -1471,7 +1471,7 @@ struct TranscriptResultView: View {
                     transcriptionID: transcription.id,
                     override: selectedRetranscriptionSpeechEngineOverride,
                     speakerSelection: canConfigureSpeakers
-                        ? selectedRetranscriptionSpeakerSelection
+                        ? selectedSpeakerCountSelection
                         : nil,
                     countsOtherSpeakers: activeTranscription.sourceType == .meeting
                 )
@@ -1509,7 +1509,7 @@ struct TranscriptResultView: View {
             if retranscriptionUsesExactSpeakerCount {
                 Stepper(
                     value: $retranscriptionExactSpeakerCount,
-                    in: RetranscriptionSpeakerSelection.supportedExactCount
+                    in: SpeakerCountSelection.supportedExactCount
                 ) {
                     Text("Exact: \(retranscriptionExactSpeakerCount)")
                 }
@@ -1521,7 +1521,7 @@ struct TranscriptResultView: View {
         }
     }
 
-    private var selectedRetranscriptionSpeakerSelection: RetranscriptionSpeakerSelection {
+    private var selectedSpeakerCountSelection: SpeakerCountSelection {
         retranscriptionUsesExactSpeakerCount
             ? .exact(retranscriptionExactSpeakerCount)
             : .automatic
