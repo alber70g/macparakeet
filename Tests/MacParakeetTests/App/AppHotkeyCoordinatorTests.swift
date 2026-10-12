@@ -937,24 +937,33 @@ final class AppHotkeyCoordinatorTests: XCTestCase {
             AppHotkeyCoordinator.shouldResumeDictationHotkey(replacement, activeMode: .holdToTalk, activeHotkey: old))
     }
 
-    func testReboundHeldShortcutFallsBackToRoleMatchingSoTheTakeCanStop() {
+    func testHeldOwnerIsLostWhenNoRefreshedSpecCanResumeTheHold() {
         let delete = HotkeyTrigger.fromKeyCode(51)
-        let old = AppHotkeyCoordinator.DictationHotkeyPlan.Spec(trigger: delete, gestureMode: .holdOnly)
-        let rebound = AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .disabled, pushToTalk: .fn)
-        XCTAssertFalse(
-            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(old, activeMode: .holdToTalk, in: rebound))
-        let replacement = rebound.specs[0]
-        XCTAssertFalse(
-            AppHotkeyCoordinator.shouldResumeDictationHotkey(replacement, activeMode: .holdToTalk, activeHotkey: old))
-        XCTAssertTrue(
-            AppHotkeyCoordinator.shouldResumeDictationHotkey(replacement, activeMode: .holdToTalk, activeHotkey: nil))
+        let deleteHold = AppHotkeyCoordinator.DictationHotkeyPlan.Spec(trigger: delete, gestureMode: .holdOnly)
+        let sharedFn = AppHotkeyCoordinator.DictationHotkeyPlan.Spec(trigger: .fn, gestureMode: .doubleTapAndHold)
+        let lost: [(name: String, owner: AppHotkeyCoordinator.DictationHotkeyPlan.Spec, plan: AppHotkeyCoordinator.DictationHotkeyPlan)] = [
+            ("rebound to another key", deleteHold,
+             AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .disabled, pushToTalk: .fn)),
+            ("push to talk cleared", deleteHold,
+             AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .fn, pushToTalk: .disabled)),
+            ("same key left hands-free only", sharedFn,
+             AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .fn, pushToTalk: .disabled)),
+        ]
+        for (name, owner, plan) in lost {
+            XCTAssertFalse(
+                AppHotkeyCoordinator.heldOwnerSurvivesRefresh(owner, activeMode: .holdToTalk, in: plan), name)
+        }
 
-        let unchanged = AppHotkeyCoordinator.dictationHotkeyPlan(
+        let kept = AppHotkeyCoordinator.dictationHotkeyPlan(
             handsFree: .disabled, pushToTalk: delete, alternatePushToTalk: .fn)
+        XCTAssertTrue(AppHotkeyCoordinator.heldOwnerSurvivesRefresh(deleteHold, activeMode: .holdToTalk, in: kept))
+        let sharedToHoldOnly = AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .disabled, pushToTalk: .fn)
         XCTAssertTrue(
-            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(old, activeMode: .holdToTalk, in: unchanged))
+            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(sharedFn, activeMode: .holdToTalk, in: sharedToHoldOnly))
         XCTAssertTrue(
-            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(old, activeMode: .persistent, in: rebound))
+            AppHotkeyCoordinator.heldOwnerSurvivesRefresh(
+                deleteHold, activeMode: .persistent,
+                in: AppHotkeyCoordinator.dictationHotkeyPlan(handsFree: .disabled, pushToTalk: .fn)))
     }
 
     func testEscapeClearsPendingGestureOnNonDispatchingManager() {

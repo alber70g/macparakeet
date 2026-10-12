@@ -308,10 +308,15 @@ final class AppHotkeyCoordinator {
             onHotkeyConflict(conflict.trigger, conflict.conflicts)
         }
 
-        let activeRecordingMode = dictationRecordingModeProvider()
-        if activeRecordingMode == nil
-            || !Self.heldOwnerSurvivesRefresh(activeDictationHotkey, activeMode: activeRecordingMode, in: plan)
-        {
+        var activeRecordingMode = dictationRecordingModeProvider()
+        // A held take whose shortcut was rebound mid-take has no manager left
+        // to see its release. Finish it as that release would.
+        let heldTakeLostItsOwner = !Self.heldOwnerSurvivesRefresh(
+            activeDictationHotkey, activeMode: activeRecordingMode, in: plan)
+        if heldTakeLostItsOwner {
+            activeRecordingMode = nil
+        }
+        if activeRecordingMode == nil {
             activeDictationHotkey = nil
         }
         let entries: [(spec: DictationHotkeyPlan.Spec, manager: HotkeyManager)] = plan.specs.compactMap { spec in
@@ -339,6 +344,9 @@ final class AppHotkeyCoordinator {
                     $0.spec, activeMode: activeRecordingMode, activeHotkey: activeDictationHotkey)
             }?.manager)
         onDictationHotkeyManagersChanged(entries.map { $0.manager })
+        if heldTakeLostItsOwner {
+            onStopDictation()
+        }
     }
 
     private func stopDictationHotkeys() {
@@ -608,16 +616,15 @@ final class AppHotkeyCoordinator {
         return spec.aiFormatterEnabled == activeHotkey.aiFormatterEnabled
     }
 
-    /// A held take's shortcut can be rebound mid-take. With its trigger gone,
-    /// no manager would match the owner and the take could not be stopped, so
-    /// the caller drops ownership and lets role matching resume the take.
+    /// A held take's shortcut can be rebound mid-take. False when no spec in
+    /// the refreshed plan can resume the take, so nothing would see its release.
     static func heldOwnerSurvivesRefresh(
         _ owner: DictationHotkeyPlan.Spec?,
         activeMode: FnKeyStateMachine.RecordingMode?,
         in plan: DictationHotkeyPlan
     ) -> Bool {
         guard activeMode == .holdToTalk, let owner else { return true }
-        return plan.specs.contains { $0.trigger == owner.trigger }
+        return plan.specs.contains { shouldResumeDictationHotkey($0, activeMode: .holdToTalk, activeHotkey: owner) }
     }
 
     func syncDictationHotkeyRecordingMode(_ mode: FnKeyStateMachine.RecordingMode) {
