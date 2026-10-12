@@ -164,6 +164,14 @@ the requested pagination window.
 See the [database guide](../Sources/MacParakeetCore/Database/README.md) and
 [file audio-track contract](contracts/file-transcription-audio-tracks.md).
 
+Cancellation is checked after optional speaker detection and awaited text
+processing, with a final cooperative check before search invalidation and
+canonical publication. A late backend success or ordinary error cannot bypass
+that check. A cancelled replacement preserves the old row/index when observed
+at this boundary; cancellation arriving after it does not roll back committed
+work. Genuine optional diarization failures still allow successful ASR. See the
+[diarization cancellation amendment](adr/010-speaker-diarization.md#cancellation-boundary-amendment-2026-10-02).
+
 `MeetingImportService` is the shared app/CLI boundary for turning one external
 recording into a managed meeting. It normalizes the first/default audio stream
 under the meeting-recordings root while holding the media mutation lease,
@@ -344,7 +352,7 @@ Package requirements below describe this audited revision; `Package.swift` and
 
 | Dependency | Requirement and use |
 |---|---|
-| FluidAudio | Exact `0.17.4`; local STT, automatic Nemotron 3 diarization and Community-1 for explicit speaker constraints. Deliberate upgrades require speech/diarization validation; see ADR-010's matched evaluation. |
+| FluidAudio | Exact `0.17.7`; local STT, automatic Nemotron 3 diarization and Community-1 for explicit speaker constraints. Deliberate upgrades require speech/diarization validation; see ADR-010's matched evaluation. |
 | GRDB.swift | From `7.0.0`; database access and migrations. |
 | swift-argument-parser | From `1.3.0`; public CLI. |
 | Sparkle | From `2.9.0`; app updates and embedded framework packaging. |
