@@ -47,6 +47,10 @@ or nearly-full disks and actual Air hardware still require qualification.
 ## Correctness and bounds
 
 - Focused renderer/scratch/readiness/artifact-cleanup tests: 26 passed.
+- After review, 19 scratch/renderer tests passed again with atomic close-on-exec
+  creation and the stronger probe-read assertion. The 60-second streaming
+  echo/no-echo fixtures passed; the echo PCM hash remained identical. Invalid
+  benchmark modes exit with status 2 before compilation or fixture creation.
 - Independent extracted-old-vs-new conditioning probe: 640 exact-sample cases
   across offsets, empty/unequal tracks, chunk boundaries and flush behavior.
 - Production conditioning reads at most 4096 samples per source per step. Probe
@@ -70,7 +74,8 @@ appending the previous one, so writer backpressure cannot queue a whole output.
 Scratch uses approximately **220 MiB per hour per source**, released at render
 completion/skip/failure/cancellation. The scratch file is owner-only, its
 directory entry is removed immediately after creation, and its descriptor is
-close-on-exec so an executed helper cannot retain it. Descriptor ownership
+atomically created close-on-exec so an executed helper cannot retain it, even
+when launched concurrently with scratch creation. Descriptor ownership
 releases the storage on process exit, with no new discoverable persistent audio
 artifact. Scratch I/O errors follow the existing observable raw-source fallback.
 No audio or model cache is deleted to free RAM.

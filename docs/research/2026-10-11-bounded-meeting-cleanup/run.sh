@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+case "${1:-streaming}" in
+  baseline|streaming) ;;
+  *) printf 'mode must be baseline or streaming\n' >&2; exit 2 ;;
+esac
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 base=648d0b6f462f60520fccba402ef556c393791fd2

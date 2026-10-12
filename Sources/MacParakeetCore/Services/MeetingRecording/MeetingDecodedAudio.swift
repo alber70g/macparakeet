@@ -9,17 +9,12 @@ final class MeetingDecodedAudio {
     private(set) var count = 0
 
     init(temporaryDirectory: URL = FileManager.default.temporaryDirectory) throws {
-        var template = Array(temporaryDirectory.appendingPathComponent("macparakeet-pcm-XXXXXX").path.utf8CString)
-        let descriptor = mkstemp(&template)
+        let path = temporaryDirectory.appendingPathComponent("macparakeet-pcm-\(UUID().uuidString)").path
+        // Set close-on-exec atomically so a concurrently launched helper cannot
+        // inherit ownership of the anonymous recording scratch file.
+        let descriptor = open(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, mode_t(S_IRUSR | S_IWUSR))
         guard descriptor >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
-        guard unlink(template) == 0 else {
-            let error = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-            close(descriptor)
-            throw error
-        }
-        // An unrelated helper launched during finalization must not inherit
-        // ownership of the anonymous recording scratch file.
-        guard fcntl(descriptor, F_SETFD, FD_CLOEXEC) == 0 else {
+        guard unlink(path) == 0 else {
             let error = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             close(descriptor)
             throw error

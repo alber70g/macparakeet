@@ -33,11 +33,12 @@ Disk failure remains a visible cleanup skip, not lost capture or failed meeting.
 
 ## Verification
 
-Focused real codec round trips, bounded-range reads, disk-vs-array probe parity,
-stream-vs-array conditioning parity across offsets and flush edge cases, decode
-limits and cancellation, scratch lifetime checks, and a synthetic long-track
-footprint comparison in isolated processes. Then one full Swift test suite,
-formatting, independent correctness/maintainability/performance review, and PR CI.
+Completed: focused real codec round trips, bounded-range reads, disk-vs-array
+probe parity, stream-vs-array conditioning parity across offsets and flush edge
+cases, decode limits and cancellation, scratch lifetime checks, a synthetic
+long-track footprint comparison, one full local Swift test suite, formatting,
+and independent correctness/maintainability/performance review. PR CI and final
+hosted review remain pending; the live PR owns their current status.
 No actual Air/Teams reproduction or claim of resolving #1199 from this patch.
 
 ## Follow-ups kept separate
@@ -57,3 +58,7 @@ Full local suite on the initial implementation commit
 30 Swift Testing cases passed, zero failures. The suite is not rerun for later
 review follow-ups, which rely on focused tests. PR CI and hosted review are not
 yet recorded.
+
+Review follow-ups passed 19 focused scratch/renderer tests, strict source lint,
+60-second echo/no-echo harness runs, invalid-mode rejection, and independent
+review of atomic scratch ownership and the strengthened bounded-read assertion.

@@ -126,9 +126,11 @@ final class MeetingDecodedAudioTests: XCTestCase {
         XCTAssertEqual(emitted, count)
         XCTAssertLessThanOrEqual(maximumRead, 4_096)
         XCTAssertEqual(stream.rmsRatio, 1)
+        maximumRead = 0
         _ = try MeetingCleanedMicRenderer.probeEchoPath(
             microphone: source, system: source, microphoneStartOffsetMs: 0,
             systemStartOffsetMs: 500, sampleRate: 16_000)
+        XCTAssertGreaterThan(maximumRead, 0)
         XCTAssertLessThanOrEqual(maximumRead, 16_000 * 10)
     }
 
