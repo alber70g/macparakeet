@@ -100,6 +100,13 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
   `--speaker-max` runs (Community-1) no longer over-split audio that contains
   digital silence, such as a muted call track. Automatic speaker detection
   (Nemotron), ASR, JSON fields and exit codes are unchanged.
+- Newly seeded built-in Summary prompts include meeting notes by default,
+  including when run through `prompts run`. Existing preferences, custom prompt
+  defaults, and saved result snapshots are preserved. Disable notes with
+  `prompts set Summary --no-include-meeting-notes`; `prompts restore-defaults`
+  continues to preserve notes preferences. No JSON schema changes (#1204).
+- Prompt-result context limiting reserves transcript space before bounding
+  oversized notes or system context, including LM Studio's smaller limit.
 - Transform shortcut assignment rejects collisions with either additional dictation
   shortcut configured in the app. Existing error/output schemas are unchanged.
 
