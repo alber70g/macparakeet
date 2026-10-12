@@ -4082,6 +4082,8 @@ final class TranscriptionServiceTests: XCTestCase {
         }
         XCTAssertTrue(recorder.constraints.isEmpty)
         XCTAssertTrue(try transcriptionRepo.fetchAll().isEmpty)
+        let sttCallCount = await mockSTT.transcribeCallCount
+        XCTAssertEqual(sttCallCount, 0)
     }
 
     func testCanonicalMeetingAudioPreservesPlayableDurationIndependentOfWordTimings() async throws {

@@ -502,12 +502,15 @@ public final class TranscriptionViewModel {
     /// off: the Transcribe view hides the control then, so a count chosen
     /// earlier must not turn detection back on.
     private func consumeNextRunSpeakerSelection() -> SpeakerCountSelection? {
+        let applies = nextRunSpeakerCountApplies
         let selection = nextRunSpeakerSelection
         nextRunSpeakerSelection = .automatic
-        guard selection.exactCount != nil,
-            UserDefaultsAppRuntimePreferences.speakerDiarizationEnabled(defaults: defaults)
-        else { return nil }
-        return selection
+        return applies ? selection : nil
+    }
+
+    private var nextRunSpeakerCountApplies: Bool {
+        nextRunSpeakerSelection.exactCount != nil
+            && UserDefaultsAppRuntimePreferences.speakerDiarizationEnabled(defaults: defaults)
     }
 
     private func startTranscribingFile(
@@ -826,8 +829,11 @@ public final class TranscriptionViewModel {
             placeholderName = "Podcast episode"
         } else if YouTubeURLValidator.isYouTubeURL(url) {
             guard let videoID = YouTubeURLValidator.extractVideoID(url) else { return }
-            // Check for existing transcription of the same video
-            if let existing = try? transcriptionRepo?.fetchCompletedByVideoID(videoID) {
+            // Reuse a saved transcript of the same video, unless an exact
+            // speaker count asks for a fresh run.
+            if !nextRunSpeakerCountApplies,
+                let existing = try? transcriptionRepo?.fetchCompletedByVideoID(videoID)
+            {
                 currentTranscription = existing
                 urlInput = ""
                 return

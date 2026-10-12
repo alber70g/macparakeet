@@ -701,7 +701,7 @@ private struct NextRunSpeakerCountMenu: View {
             .accessibilityValue(valueLabel)
 
             if selection.exactCount != nil {
-                Text("Next file or link only")
+                Text("Applies once, then resets")
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(.tertiary)
             }

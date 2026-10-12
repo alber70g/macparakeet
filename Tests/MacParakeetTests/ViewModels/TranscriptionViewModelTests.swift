@@ -264,6 +264,48 @@ final class TranscriptionViewModelTests: XCTestCase {
         XCTAssertEqual(urlCallCount, 1)
     }
 
+    func testExactNextRunSpeakerCountBypassesSavedVideoAndRunsFresh() async throws {
+        let saved = Transcription(
+            fileName: "Saved video",
+            rawTranscript: "Old",
+            status: .completed,
+            sourceURL: "https://youtu.be/dQw4w9WgXcQ"
+        )
+        mockRepo.transcriptions = [saved]
+        let suiteName = makeIsolatedDefaultsSuite("TranscriptionViewModelTests-")
+        viewModel = TranscriptionViewModel(defaults: UserDefaults(suiteName: suiteName)!)
+        viewModel.configure(transcriptionService: mockService, transcriptionRepo: mockRepo)
+        viewModel.urlInput = "https://youtu.be/dQw4w9WgXcQ"
+
+        viewModel.nextRunSpeakerSelection = .exact(2)
+        viewModel.transcribeURL()
+        XCTAssertEqual(viewModel.nextRunSpeakerSelection, .automatic)
+        try await waitUntil { !self.viewModel.isTranscribing }
+
+        let selections = await mockService.transcriptionSpeakerSelections
+        let urlCallCount = await mockService.transcribeURLCallCount
+        XCTAssertEqual(selections, [.exact(2)])
+        XCTAssertEqual(urlCallCount, 1)
+    }
+
+    func testAutomaticSpeakerCountStillReusesSavedVideo() async throws {
+        let saved = Transcription(
+            fileName: "Saved video",
+            rawTranscript: "Old",
+            status: .completed,
+            sourceURL: "https://youtu.be/dQw4w9WgXcQ"
+        )
+        mockRepo.transcriptions = [saved]
+        viewModel.configure(transcriptionService: mockService, transcriptionRepo: mockRepo)
+        viewModel.urlInput = "https://youtu.be/dQw4w9WgXcQ"
+
+        viewModel.transcribeURL()
+
+        let urlCallCount = await mockService.transcribeURLCallCount
+        XCTAssertEqual(urlCallCount, 0)
+        XCTAssertEqual(viewModel.currentTranscription?.id, saved.id)
+    }
+
     func testTranscribeFileErrorHandling() async throws {
         await mockService.configure(
             error: NSError(
