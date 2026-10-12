@@ -5,6 +5,27 @@
 The [2026-09-25 evaluation](2026-09-25-nemotron-evaluation.md) records the
 measured comparison, integration decision, and remaining qualification limits.
 
+The [2026-10-02 audit](../../docs/audits/2026-10-02-app-audit/diarization.md)
+adds a fresh two-fixture, two-backend acoustic regression run with isolated
+model caches and network access denied. Its committed receipts include audio,
+model, executable and scorer hashes; the generated full-WAV scoring regions
+are explicit. It reproduces a remaining extra Nemotron speaker on `ouvtt`.
+These Debug executions are neither an optimized speed benchmark nor held-out
+quality evidence: Nemotron's training includes VoxConverse dev and test.
+
+The audit also provides a small executable replay of the production word
+merger's singleton and unknown-gap behavior. That replay characterizes the
+current smoothing policy; removing smoothing requires a separate final-word
+accuracy evaluation. Acoustic DER, roster count, word attribution and physical
+capture are separate verification lanes.
+
+The audit's isolated real-ASR product test also passed on a 180-second public
+crop, including meeting source offset, database reopen, artifacts, file
+transcription and post-meeting silence. Its fixed-ASR word projection exposes
+one eligible correct Nemotron assignment lost to existing smoothing. The
+committed summary records exclusions and peak process memory; it remains a
+small training-exposed diagnostic, not cpWER or physical capture qualification.
+
 The matched acoustic runner compares the frozen FluidAudio 0.15.7 Community-1
 configuration with the new Nemotron adapter. It preserves overlaps and brief
 intervals and scores zero-collar DER with overlap included. Downloaded audio,
@@ -17,7 +38,7 @@ model caches, and large prediction files stay outside Git.
 - `manifests/alimeeting-test.json`: all 20 official AliMeeting Test sessions,
   far channel one and a fixed arithmetic mean of every participant headset.
 - `Baseline/`: isolated SDK 0.15.7 executable; reads existing models offline
-  and records model/audio hashes. The app executable uses SDK 0.17.4.
+  and records model/audio hashes. The app executable uses SDK 0.17.7.
 - `scripts/run_comparison.py`: sequential matched runs, alternating backend
   order, checking audio identity, retaining failures and per-recording logs.
 - `scripts/score_diarization.py`: pinned dscore/NIST engine, explicit coverage

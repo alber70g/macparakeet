@@ -1,6 +1,6 @@
 # MacParakeet: Architecture
 
-> Status: **ACTIVE** — implementation map, audited 2026-09-07 and refreshed for post-0.8.7 paths on 2026-09-24.
+> Status: **ACTIVE** — implementation map, refreshed for the independent 2026-10-02 audit.
 > Source presence describes development capability. The
 > [release and flag table](README.md#release-channels-and-feature-flags)
 > governs availability; this document is not release qualification.
@@ -156,8 +156,21 @@ Completion uses `TranscriptionRepository.savePreservingUserMetadata`: merge
 against current user notes, names, favorites, artifact/audio pointers and other
 user metadata inside the write transaction. Publish the returned row. A missing
 row aborts completion instead of recreating an item deleted during processing.
+GUI and CLI callers must return that merged row without a later full-row save
+from their pre-recognition snapshot. The same ownership rule applies to
+presentation: a successful Library favorite/delete/audio-detach mutation
+invalidates an older in-flight page snapshot before it can publish, retaining
+the requested pagination window.
 See the [database guide](../Sources/MacParakeetCore/Database/README.md) and
 [file audio-track contract](contracts/file-transcription-audio-tracks.md).
+
+Cancellation is checked after optional speaker detection and awaited text
+processing, with a final cooperative check before search invalidation and
+canonical publication. A late backend success or ordinary error cannot bypass
+that check. A cancelled replacement preserves the old row/index when observed
+at this boundary; cancellation arriving after it does not roll back committed
+work. Genuine optional diarization failures still allow successful ASR. See the
+[diarization cancellation amendment](adr/010-speaker-diarization.md#cancellation-boundary-amendment-2026-10-02).
 
 `MeetingImportService` is the shared app/CLI boundary for turning one external
 recording into a managed meeting. It normalizes the first/default audio stream
@@ -339,7 +352,7 @@ Package requirements below describe this audited revision; `Package.swift` and
 
 | Dependency | Requirement and use |
 |---|---|
-| FluidAudio | Exact `0.17.4`; local STT, automatic Nemotron 3 diarization and Community-1 for explicit speaker constraints. Deliberate upgrades require speech/diarization validation; see ADR-010's matched evaluation. |
+| FluidAudio | Exact `0.17.7`; local STT, automatic Nemotron 3 diarization and Community-1 for explicit speaker constraints. Deliberate upgrades require speech/diarization validation; see ADR-010's matched evaluation. |
 | GRDB.swift | From `7.0.0`; database access and migrations. |
 | swift-argument-parser | From `1.3.0`; public CLI. |
 | Sparkle | From `2.9.0`; app updates and embedded framework packaging. |
@@ -377,3 +390,8 @@ Run from the worktree that owns the change. The development script owns GUI
 bundle preparation and `-skipMacroValidation` for the Markdown dependency; do
 not reconstruct a partial Xcode invocation from an old architecture example.
 Use isolated app state for QA as documented in the distribution/testing guides.
+An AppPaths override alone does not isolate shared UserDefaults, Keychain or
+TCC. Full app qualification requires the disposable account described in
+[native Library E2E](../docs/testing/native-library-e2e.md). Isolated SwiftUI
+renders with fake services can inspect actual view layout without launching
+the app, but do not prove first-launch permission or delivery behavior.

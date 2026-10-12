@@ -94,6 +94,25 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
 
 ## [Unreleased]
 
+### Changed
+
+- FluidAudio 0.17.7. Explicit `--speaker-count`, `--speaker-min` and
+  `--speaker-max` runs (Community-1) no longer over-split audio that contains
+  digital silence, such as a muted call track. Automatic speaker detection
+  (Nemotron), ASR, JSON fields and exit codes are unchanged.
+
+### Fixed
+
+- `retranscribe --update` for saved transcriptions and meetings returns the row
+  committed by the shared transcription service. Notes, chat, names, favorites
+  and audio metadata changed during recognition are preserved; the CLI no longer
+  performs a second stale save that could undo those edits or recreate a deleted
+  recording. JSON shapes and exit-code meanings are unchanged.
+- Rerunning a completed or cancelled dictation requires its row still to exist
+  with the original status. A concurrent deletion or status change now fails
+  with a `lookup` error instead of restoring stale history or recounting a
+  deleted take. Failed-dictation recovery and audio-retention rules are unchanged.
+
 ## [5.0.0] — 2026-09-27 (bundled with MacParakeet 0.8.9)
 
 This major version removes Apple Intelligence analysis and Transform execution.

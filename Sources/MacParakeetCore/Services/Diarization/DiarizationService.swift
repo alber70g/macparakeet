@@ -255,9 +255,15 @@ public actor DiarizationService: DiarizationServiceProtocol {
             fluidResult = try await inferenceGate.withExclusiveAccess {
                 try await manager.process(audioURL: audioURL)
             }
-        } catch let error as OfflineDiarizationError where error.isNoSpeechDetected {
+        } catch {
+            // The SDK can finish with a different error after cancellation.
+            try Task.checkCancellation()
+            guard let diarizationError = error as? OfflineDiarizationError,
+                diarizationError.isNoSpeechDetected
+            else { throw error }
             return MacParakeetDiarizationResult(segments: [], speakerCount: 0, speakers: [])
         }
+        try Task.checkCancellation()
 
         // Sort by start time before assigning stable IDs so "S1" is the
         // first speaker to *talk* (chronologically), not the first speaker
@@ -493,7 +499,7 @@ public actor DiarizationService: DiarizationServiceProtocol {
 
     /// Bump on any FluidAudio upgrade that could move the clustering centroid,
     /// even when the embedding model is untouched.
-    private nonisolated static let pipelineRevision = "fluidaudio-0.17.4"
+    private nonisolated static let pipelineRevision = "fluidaudio-0.17.7"
 
     /// Identity of the representation the shipping configuration produces.
     public nonisolated static var defaultModelIdentity: SpeakerModelIdentity {

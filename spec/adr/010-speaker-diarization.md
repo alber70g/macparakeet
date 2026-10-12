@@ -2,11 +2,12 @@
 
 > Status: **Accepted**
 > Date: 2026-03-04
-> Current scope (2026-09-25): post-ASR file/URL transcription and isolated system-track meeting refinement. The Nemotron amendment below governs the default and FluidAudio 0.17.4 pin. Earlier model comparisons, throughput claims and Community-1-only decisions remain historical context. This development decision does not describe the stable DMG.
+> Current scope (2026-09-25): post-ASR file/URL transcription and isolated system-track meeting refinement. The Nemotron amendment below governs the default; the 2026-10-08 amendment governs the FluidAudio 0.17.7 pin. Earlier model comparisons, throughput claims and Community-1-only decisions remain historical context. This development decision does not describe the stable DMG.
 
 ## Nemotron default decision (2026-09-25)
 
-Use **Nemotron 3 `fast128` through FluidAudio 0.17.4** for automatic speaker
+Use **Nemotron 3 `fast128` through FluidAudio 0.17.4** (pinned to 0.17.7 by the
+2026-10-08 amendment, with identical Nemotron results) for automatic speaker
 detection after recording. Keep the existing Community-1/WeSpeaker/VBx service
 for explicit Exact/Range choices and experimental voice-profile builds, whose
 identity embeddings Nemotron does not provide. The shared factory supplies the
@@ -52,6 +53,78 @@ ASR regression controls and product E2E evidence. The earlier evaluation-only
 Nemotron licensing note is superseded by the final model's OpenMDW-1.1 license;
 attribution and its full license accompany the app. FluidAudio itself uses
 Apache-2.0. No new runtime or cloud speech service is introduced.
+
+### Implementation qualification (2026-10-02 audit)
+
+The [October audit](../../docs/audits/2026-10-02-app-audit/diarization.md)
+re-executed both current backends on the public `wibky` and `ouvtt` regression
+fixtures with network access denied and cloned, hash-verified model caches.
+Nemotron returned one and three speakers against one and two reference
+speakers; Community-1 returned two and four. The audit records DER components,
+the exact scoring region and Debug-runtime limits. VoxConverse is in
+Nemotron's disclosed training data, so these are regression checks, not
+held-out generalization evidence or a replacement for the matched evaluation.
+
+The same audit passed the real-ASR meeting/file persistence and silence-reset
+test on a 180-second public crop with a separate microphone fixture. In its
+fixed-ASR diagnostic, Nemotron's 491 eligible word midpoints agreed with the
+reference speaker 487 times before smoothing and 486 afterwards. This is a
+narrow diagnostic excluding overlap and ASR errors, not cpWER. The meeting
+also retained a source-only `Others` word alongside two detected remote
+identities; today's roster count includes that fallback bucket as an entry.
+Neither result supports presenting roster size as a verified number of people.
+
+Three implementation boundaries remain material:
+
+- The existing word merger can replace a real one-word reply with the
+  surrounding speaker and fill unknown gaps. This is deliberate smoothing,
+  tested as current behavior, not a guarantee of correct word attribution.
+  A policy change needs final-word evaluation, not only better acoustic DER.
+- A diarization failure preserves successful ASR, but the nonblocking warning
+  specified below is not yet implemented as a durable per-run GUI/CLI outcome.
+  Current completion telemetry also omits the actual backend and fallback
+  result; `speaker_prior` describes the requested policy and may be unapplied
+  when advisory fallback fails. Preserve the warning requirement rather than
+  presenting it as already shipped.
+- Files retain raw acoustic `diarizationSegments`; captured meetings rebuild
+  them from recognized words, and manual reassignment can also rebuild them.
+  They are therefore not a uniform acoustic-activity timeline. The separate
+  [audio speaker timeline contract](../contracts/audio-speaker-timeline-v1.md)
+  remains the intended boundary for preserving that evidence.
+
+## FluidAudio 0.17.7 (2026-10-08)
+
+Pin FluidAudio 0.17.7. Over 0.17.4 it adds two Community-1 fixes from
+[#1046](https://github.com/moona3k/macparakeet/issues/1046):
+[FluidAudio #988](https://github.com/FluidInference/FluidAudio/pull/988) takes
+the FBank mean over frames that hold signal, so windows of digital silence (a
+muted call track, the padded last window of a file) no longer lose the voice
+and gather into extra clusters; [FluidAudio
+#982](https://github.com/FluidInference/FluidAudio/pull/982) re-embeds
+zero-vote runs from the span repeated across the window instead of zero
+padding. The other changes since 0.17.4 add the Phonon-2 ASR model (not
+offered by the app; `AppPaths` only maps its cache folder), make custom
+vocabulary alignment iterative (#962), add a LocalVQE echo-suppression beta
+the app does not use (its own LocalVQE runtime is separate), adopt matching
+unmarked model caches during connected preparation (#977; the app still reports
+an unmarked cache as not ready, so the one connected setup described above still
+applies), and change TTS.
+
+Matched app-bench runs on the 16 AMI mixed-headset test meetings, NIST-scored
+as in the Nemotron evaluation, original audio and audio with non-speech set to
+exact zero (gated):
+
+| Backend / audio | 0.17.4 DER, confusion, exact count | 0.17.7 DER, confusion, exact count |
+| --- | ---: | ---: |
+| Community-1 / original | 23.19%, 3.47%, 12/16 | 22.97%, 3.25%, 14/16 |
+| Community-1 / gated | 24.82%, 5.62%, 1/16 | 22.42%, 3.22%, 14/16 |
+| Nemotron fast128 / original | 26.03%, 0.72%, 15/16 | identical |
+| Nemotron fast128 / gated | 25.76%, 0.76%, 14/16 | identical |
+
+Misses and false alarms are unchanged in every arm. The Community-1 aggregation
+revision becomes `fluidaudio-0.17.7`: experimental voice profiles enrolled under
+0.17.4 stay comparable with new runs under the stricter cross-aggregation
+threshold (speaker-voiceprints contract).
 
 ## Context (original decision)
 
@@ -558,3 +631,22 @@ Scope, gating and the release conditions live in
 [F13a](../02-features.md) and
 [the plan](../../plans/active/2026-07-03-speaker-voiceprints.md). The internal
 boundary is [`spec/contracts/speaker-voiceprints.md`](../contracts/speaker-voiceprints.md).
+
+## Cancellation boundary amendment (2026-10-02)
+
+Optional speaker-detection failure remains non-fatal only while its owning task
+is not cancelled. After SDK/native inference returns, adapters check the task
+before accepting success, interpreting no-speech as empty success, or forwarding
+a generic backend error. Advisory fallback follows the same rule. Active
+native work is still awaited under its inference permit; this does not promise
+immediate interruption of a CoreML kernel.
+
+File and meeting orchestration also check cancellation before interpreting
+optional detection outcomes and after awaited post-processing. The last check
+precedes search invalidation and canonical transcript publication. Cancellation
+observed there preserves an existing retranscription and its index; cancellation
+arriving after that boundary may commit and does not roll back saved work.
+The [regression record](../../docs/audits/2026-10-02-diarization-cancellation.md)
+covers late backend, formatter and title outcomes plus uncancelled controls.
+Durable speaker-detection outcome/provenance remains a
+[separate planned slice](../../plans/active/2026-10-02-diarization-outcomes.md).
