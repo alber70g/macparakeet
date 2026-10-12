@@ -1635,7 +1635,7 @@ struct TranscriptResultView: View {
     }
 
     private var speakerCountValue: Int {
-        activeTranscription.speakers.map { SpeakerInfo.countedSpeakers(in: $0).count }
+        activeTranscription.speakers.map { SpeakerInfo.participants(in: $0).count }
             ?? activeTranscription.speakerCount ?? 0
     }
 
@@ -1644,7 +1644,7 @@ struct TranscriptResultView: View {
     private var defaultRetranscriptionSpeakerCount: Int {
         guard activeTranscription.sourceType == .meeting else { return speakerCountValue }
         if let speakers = activeTranscription.speakers, !speakers.isEmpty {
-            return SpeakerInfo.countedSpeakers(in: speakers)
+            return SpeakerInfo.participants(in: speakers)
                 .filter { $0.id != AudioSource.microphone.rawValue }.count
         }
         return max(0, speakerCountValue - 1)
@@ -4948,7 +4948,7 @@ struct TranscriptResultView: View {
             editableSegments: attribution?.editableSegments ?? [],
             effectiveTurnCards: (attribution?.speakers.isEmpty ?? true)
                 ? [] : identifiedEffectiveSpeakerTurnCards(attribution?.turns ?? []),
-            availableSpeakers: attribution?.speakers ?? [],
+            availableSpeakers: SpeakerInfo.participants(in: attribution?.speakers ?? []),
             isSpeakerEditing: editingSpeakers,
             isTimedTextEditingAvailable: timedTextEditingAvailable,
             isSpeakerActionDisabled: viewModel.isApplyingSpeakerCorrection,
@@ -5045,7 +5045,7 @@ struct TranscriptResultView: View {
         }
 
         Menu("Assign to…") {
-            ForEach(viewModel.speakerAttribution?.speakers ?? [], id: \.id) { speaker in
+            ForEach(SpeakerInfo.participants(in: viewModel.speakerAttribution?.speakers ?? []), id: \.id) { speaker in
                 Button(speaker.label) {
                     assignSelectedSegments(to: .speaker(id: speaker.id))
                 }
@@ -5354,7 +5354,10 @@ struct TranscriptResultView: View {
                             }
 
                             Menu("Merge into…") {
-                                ForEach(speakers.filter { $0.id != speaker.id }, id: \.id) { target in
+                                ForEach(
+                                    SpeakerInfo.participants(in: speakers).filter { $0.id != speaker.id },
+                                    id: \.id
+                                ) { target in
                                     Button(target.label) {
                                         viewModel.applySpeakerCorrection(
                                             .merge(

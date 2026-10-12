@@ -370,7 +370,7 @@ struct MeetingRowCard<MenuContent: View>: View {
     }
 
     private var displayedSpeakerCount: Int? {
-        let count = transcription.speakers.map { SpeakerInfo.countedSpeakers(in: $0).count }
+        let count = transcription.speakers.map { SpeakerInfo.participants(in: $0).count }
             ?? transcription.speakerCount ?? 0
         return count >= 2 ? count : nil
     }

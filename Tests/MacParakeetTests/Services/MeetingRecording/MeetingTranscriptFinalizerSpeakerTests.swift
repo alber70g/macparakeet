@@ -46,7 +46,7 @@ final class MeetingTranscriptFinalizerSpeakerTests: XCTestCase {
                 SpeakerInfo(id: "system:S1", label: "Others 1"),
                 SpeakerInfo(id: "system:S2", label: "Others 2"),
             ])
-        XCTAssertEqual(SpeakerInfo.countedSpeakers(in: finalized.speakers).map(\.id), ["system:S1", "system:S2"])
+        XCTAssertEqual(SpeakerInfo.participants(in: finalized.speakers).map(\.id), ["system:S1", "system:S2"])
     }
 
     /// Before the uncovered system word the transcript has a `Me` turn. The
@@ -67,7 +67,7 @@ final class MeetingTranscriptFinalizerSpeakerTests: XCTestCase {
 
         XCTAssertEqual(finalized.words.map(\.speakerId), ["system:S1", "microphone", "system"])
         XCTAssertEqual(finalized.speakers.map(\.label), ["Me", "Unattributed", "Others 1"])
-        XCTAssertEqual(SpeakerInfo.countedSpeakers(in: finalized.speakers).map(\.label), ["Me", "Others 1"])
+        XCTAssertEqual(SpeakerInfo.participants(in: finalized.speakers).map(\.label), ["Me", "Others 1"])
     }
 
     func testSystemTrackWithoutDiarizationKeepsOthers() {
@@ -80,7 +80,7 @@ final class MeetingTranscriptFinalizerSpeakerTests: XCTestCase {
 
         XCTAssertEqual(finalized.words.map(\.speakerId), ["system"])
         XCTAssertEqual(finalized.speakers, [SpeakerInfo(id: "system", label: "Others")])
-        XCTAssertEqual(SpeakerInfo.countedSpeakers(in: finalized.speakers).count, 1)
+        XCTAssertEqual(SpeakerInfo.participants(in: finalized.speakers).count, 1)
     }
 
     func testSystemTrackWhenNoClusterWinsAWordKeepsOthers() {
@@ -107,13 +107,13 @@ final class MeetingTranscriptFinalizerSpeakerTests: XCTestCase {
             SpeakerInfo(id: "user:6F9619FF-8B86-D011-B42D-00CF4FC964FF", label: "Dana"),
         ]
         XCTAssertEqual(
-            SpeakerInfo.countedSpeakers(in: legacy).map(\.label),
+            SpeakerInfo.participants(in: legacy).map(\.label),
             ["Me", "Others 1", "Dana"]
         )
 
         var renamed = legacy
         renamed[1].label = "Room"
-        XCTAssertEqual(SpeakerInfo.countedSpeakers(in: renamed).count, 3)
+        XCTAssertEqual(SpeakerInfo.participants(in: renamed).count, 3)
     }
 
     private func finalize(

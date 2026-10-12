@@ -1580,8 +1580,8 @@ public actor TranscriptionService:
             transcription.meetingCaptureReport = recording.captureReport
                 ?? transcription.meetingCaptureReport
             transcription.speakers = finalized.speakers
-            let countedSpeakers = SpeakerInfo.countedSpeakers(in: finalized.speakers)
-            transcription.speakerCount = countedSpeakers.isEmpty ? nil : countedSpeakers.count
+            let participants = SpeakerInfo.participants(in: finalized.speakers)
+            transcription.speakerCount = participants.isEmpty ? nil : participants.count
             transcription.diarizationSegments = finalized.diarizationSegments.isEmpty ? nil : finalized.diarizationSegments
             let transcriptSegments = TranscriptSegmenter.materializeSegments(
                 words: corrected.words,
