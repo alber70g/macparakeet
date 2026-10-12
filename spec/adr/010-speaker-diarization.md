@@ -2,7 +2,7 @@
 
 > Status: **Accepted**
 > Date: 2026-03-04
-> Current scope (2026-09-25): post-ASR file/URL transcription and isolated system-track meeting refinement. The Nemotron amendment below governs the default; the 2026-10-08 amendment governs the FluidAudio 0.17.7 pin. Earlier model comparisons, throughput claims and Community-1-only decisions remain historical context. This development decision does not describe the stable DMG.
+> Current scope (2026-09-25): post-ASR file/URL transcription and isolated system-track meeting refinement. The Nemotron amendment below governs the default; the 2026-10-08 amendment governs the FluidAudio 0.17.7 pin; the 2026-10-12 amendment governs one-word speaker turns. Earlier model comparisons, throughput claims and Community-1-only decisions remain historical context. This development decision does not describe the stable DMG.
 
 ## Nemotron default decision (2026-09-25)
 
@@ -396,9 +396,11 @@ Skip diarization for: dictation (single speaker by design), or when the correspo
 > close Auto 1:1 over-splits (#944); `MeetingSpeakerPrior` is still
 > `max = n + 1`.
 
-> **Amendment (2026-09-15, issue #1046):** `SpeakerMerger` now collapses
+> **Amendment (2026-09-15, issue #1046):** `SpeakerMerger` collapsed
 > a singleton word (or an unlabeled run) when both neighboring runs share
-> a speaker. A short between two different speakers remains assigned by
+> a speaker. The singleton-word half is superseded by the 2026-10-12
+> amendment; unlabeled runs between the same speaker are still filled.
+> A short between two different speakers remains assigned by
 > overlap or unlabeled; transcript edges and multi-word speaker runs are
 > unchanged. This presentation-layer post-pass does not change FluidAudio
 > clusters, speaker rosters, `clustering.threshold`, or voice-profile
@@ -416,6 +418,22 @@ Skip diarization for: dictation (single speaker by design), or when the correspo
 > sub-second words that are not isolated flips, a safer over-split
 > consolidation signal, stable IDs across re-runs, in-person microphone
 > diarization, and Nemotron-3 Diarization.
+
+> **Amendment (2026-10-12, [#1218](https://github.com/moona3k/macparakeet/pull/1218), issue #1046):**
+> Supersedes the singleton-word collapse in the 2026-09-15 amendment.
+> After max-overlap assignment, `SpeakerMerger` still fills an unlabeled
+> run when both neighboring runs share a speaker. It keeps a one-word run
+> that already has a different speaker. Two-word runs, transcript edges,
+> and gaps between different speakers stay as assigned. This does not
+> change FluidAudio clusters, speaker rosters, or diarizer output.
+>
+> Evidence is the word-attribution scorer in
+> [#1217](https://github.com/moona3k/macparakeet/pull/1217), recorded in
+> the 2026-10-02 implementation-boundaries note above. On 16 AMI
+> mixed-headset test meetings and the app's Parakeet words, keeping the
+> word was right for 73 of the 81 Nemotron words the old merge changed,
+> against 8 when merged, and 39 of 67 for Community-1 against 14. The
+> 2026-09-15 centroid-consolidation rejection still stands.
 
 **Model preparation (2026-09-07):** The service shares one model-loading task
 across speaker constraints and initializes each configured manager from those
