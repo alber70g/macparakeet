@@ -4008,6 +4008,56 @@ final class TranscriptionServiceTests: XCTestCase {
         XCTAssertTrue(diarizeCalled)
     }
 
+    func testFirstRunApplePodcastsExactSpeakerCountUsesConstrainedServiceAndPersists() async throws {
+        let downloadedURL = try makeTempDownloadedAudio(fileExtension: "mp3")
+        defer { try? FileManager.default.removeItem(at: downloadedURL) }
+        let resolver = StubPodcastResolver(episode: ResolvedPodcastEpisode(
+            audioURL: "https://cdn.example.com/audio/7.mp3",
+            episodeTitle: "Episode 7",
+            showName: "Two Hosts",
+            artworkURL: nil,
+            episodeDescription: nil,
+            durationSeconds: 60,
+            releaseDate: nil
+        ))
+        await mockSTT.configure(result: STTResult(
+            text: "Hello there",
+            words: [TimestampedWord(word: "Hello", startMs: 0, endMs: 200, confidence: 1)]
+        ))
+        let diarization = MockDiarizationService()
+        await diarization.configure(result: MacParakeetDiarizationResult(
+            segments: [SpeakerSegment(speakerId: "S1", startMs: 0, endMs: 200)],
+            speakerCount: 1,
+            speakers: [SpeakerInfo(id: "S1", label: "Speaker 1")]
+        ))
+        let recorder = DiarizationConstraintRecorder()
+        let configuredService = TranscriptionService(
+            audioProcessor: mockAudio,
+            sttTranscriber: mockSTT,
+            transcriptionRepo: transcriptionRepo,
+            shouldKeepDownloadedAudio: { false },
+            podcastResolver: resolver,
+            podcastAudioFetcher: StubPodcastAudioFetcher(fileURL: downloadedURL),
+            diarizationService: nil,
+            diarizationServiceFactory: DiarizationServiceFactory { constraint in
+                recorder.record(constraint)
+                return diarization
+            }
+        )
+
+        let result = try await configuredService.transcribeURL(
+            urlString: "https://podcasts.apple.com/us/podcast/two-hosts/id1?i=7",
+            speakerSelection: .exact(2)
+        )
+
+        XCTAssertEqual(recorder.constraints, [.exact(2)])
+        let diarizeCalled = await diarization.diarizeCalled
+        XCTAssertTrue(diarizeCalled)
+        let persisted = try XCTUnwrap(transcriptionRepo.fetch(id: result.id))
+        XCTAssertEqual(persisted.sourceType, .podcast)
+        XCTAssertEqual(persisted.speakers, [SpeakerInfo(id: "S1", label: "Speaker 1")])
+    }
+
     func testFirstRunRejectsUnsupportedExactSpeakerCountBeforeTranscribing() async throws {
         let recorder = DiarizationConstraintRecorder()
         let configuredService = TranscriptionService(

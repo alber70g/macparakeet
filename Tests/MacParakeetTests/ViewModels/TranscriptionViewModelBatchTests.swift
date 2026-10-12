@@ -400,6 +400,46 @@ final class TranscriptionViewModelBatchTests: XCTestCase {
         XCTAssertEqual(order, ["a.mp3", "b.mp3", "c.mp3"])
     }
 
+    func testBatchSpeakerCountSurvivesAFailedFile() async throws {
+        await mockService.configureBatch(errors: [
+            "b.mp3": NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "boom"])
+        ])
+        let vm = makeViewModel()
+        vm.nextRunSpeakerSelection = .exact(2)
+
+        let urls = [try touch("a.mp3"), try touch("b.mp3"), try touch("c.mp3")]
+        XCTAssertTrue(vm.transcribeFiles(urls: urls))
+        try await waitUntil { !vm.isDiscoveringFiles }
+        try await waitUntil { !vm.isBatchActive }
+
+        let selections = await mockService.transcriptionSpeakerSelections
+        XCTAssertEqual(selections, [.exact(2), .exact(2), .exact(2)])
+    }
+
+    func testCancelledBatchSpeakerCountDoesNotReachTheNextRun() async throws {
+        await mockService.configureDelay(milliseconds: 60)
+        let vm = makeViewModel()
+        vm.nextRunSpeakerSelection = .exact(2)
+
+        let urls = [try touch("a.mp3"), try touch("b.mp3"), try touch("c.mp3")]
+        XCTAssertTrue(vm.transcribeFiles(urls: urls))
+        try await waitUntil { !vm.isDiscoveringFiles }
+        try await waitUntil { vm.isTranscribing }
+        vm.cancelBatch()
+        // Let the in-flight, non-cancellation-aware file resolve late.
+        try await Task.sleep(for: .milliseconds(200))
+        let cancelledCalls = await mockService.transcriptionSpeakerSelections.count
+
+        vm.transcribeFile(url: try touch("later.mp3"))
+        try await waitUntil { !vm.isTranscribing }
+
+        let selections = await mockService.transcriptionSpeakerSelections
+        let names = await mockService.transcribedFileNames
+        XCTAssertEqual(selections.count, cancelledCalls, "The Auto run must not carry the batch count")
+        XCTAssertEqual(names.last, "later.mp3")
+        XCTAssertEqual(vm.nextRunSpeakerSelection, .automatic)
+    }
+
     func testExactNextRunSpeakerCountKeepsSelectedAudioTrack() async throws {
         let url = try touch("panel.mkv")
         let tracks = [
