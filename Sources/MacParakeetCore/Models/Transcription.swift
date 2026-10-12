@@ -318,6 +318,21 @@ public struct SpeakerInfo: Codable, Sendable, Equatable {
         }
         return false
     }
+
+    /// Roster label for system-track words that no diarized cluster claimed.
+    public static let unattributedSystemLabel = "Unattributed"
+
+    /// The roster entries that stand for people.
+    ///
+    /// In a diarized meeting the raw `system` row sits beside `system:` clusters
+    /// and only holds words no cluster claimed, so it is left out of speaker
+    /// counts (#1228). Without clusters it is everyone on the call and counts.
+    /// The test is structural because the label can be renamed.
+    public static func countedSpeakers(in speakers: [SpeakerInfo]) -> [SpeakerInfo] {
+        let systemID = AudioSource.system.rawValue
+        guard speakers.contains(where: { $0.id.hasPrefix("\(systemID):") }) else { return speakers }
+        return speakers.filter { $0.id != systemID }
+    }
 }
 
 public struct DiarizationSegmentRecord: Codable, Sendable, Equatable {

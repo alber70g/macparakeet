@@ -1635,7 +1635,8 @@ struct TranscriptResultView: View {
     }
 
     private var speakerCountValue: Int {
-        activeTranscription.speakers?.count ?? activeTranscription.speakerCount ?? 0
+        activeTranscription.speakers.map { SpeakerInfo.countedSpeakers(in: $0).count }
+            ?? activeTranscription.speakerCount ?? 0
     }
 
     /// Meeting retranscription configures the diarized participants captured
@@ -1643,7 +1644,8 @@ struct TranscriptResultView: View {
     private var defaultRetranscriptionSpeakerCount: Int {
         guard activeTranscription.sourceType == .meeting else { return speakerCountValue }
         if let speakers = activeTranscription.speakers, !speakers.isEmpty {
-            return speakers.filter { $0.id != AudioSource.microphone.rawValue }.count
+            return SpeakerInfo.countedSpeakers(in: speakers)
+                .filter { $0.id != AudioSource.microphone.rawValue }.count
         }
         return max(0, speakerCountValue - 1)
     }

@@ -127,6 +127,11 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
   with the original status. A concurrent deletion or status change now fails
   with a `lookup` error instead of restoring stale history or recounting a
   deleted take. Failed-dictation recovery and audio-retention rules are unchanged.
+- Meetings transcribed or retranscribed with speaker detection no longer list
+  system-track words that no detected speaker claimed as an extra `Others`
+  speaker. Their `speakers` entry keeps the id `system` with the label
+  `Unattributed`, and `speakerCount` leaves it out. Rows saved earlier keep their
+  stored values. JSON shapes are unchanged (#1228).
 
 ## [5.0.0] — 2026-09-27 (bundled with MacParakeet 0.8.9)
 
