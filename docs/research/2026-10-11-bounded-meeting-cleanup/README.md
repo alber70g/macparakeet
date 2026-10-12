@@ -68,12 +68,12 @@ appending the previous one, so writer backpressure cannot queue a whole output.
 ## Storage and privacy tradeoff
 
 Scratch uses approximately **220 MiB per hour per source**, released at render
-completion/skip/failure/cancellation. `mkstemp` creates a private descriptor and
-its directory entry is immediately removed. Descriptor ownership releases the
-storage on process exit, with no new discoverable persistent audio artifact.
-`FD_CLOEXEC` prevents an executed helper from retaining the descriptor. Scratch
-I/O errors follow the existing observable raw-source fallback. No audio or model
-cache is deleted to free RAM.
+completion/skip/failure/cancellation. The scratch file is owner-only, its
+directory entry is removed immediately after creation, and its descriptor is
+close-on-exec so an executed helper cannot retain it. Descriptor ownership
+releases the storage on process exit, with no new discoverable persistent audio
+artifact. Scratch I/O errors follow the existing observable raw-source fallback.
+No audio or model cache is deleted to free RAM.
 
 This does not repair unbounded capture ingress, speech/diarization model residency,
 other engines' whole-file decoding, or Library caches. It does not establish the

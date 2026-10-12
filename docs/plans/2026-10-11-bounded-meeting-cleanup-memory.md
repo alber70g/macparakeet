@@ -1,6 +1,6 @@
 # Bound memory during meeting microphone cleanup
 
-Status: implemented; focused checks and independent review passed; full suite/PR gates pending. Base: `648d0b6f462f60520fccba402ef556c393791fd2`.
+Status: implemented; focused checks, independent review and the full local suite passed; PR CI and hosted review pending. Base: `648d0b6f462f60520fccba402ef556c393791fd2`.
 
 ## Intent and scope
 
@@ -51,3 +51,9 @@ See [native measurements and reproduction](../research/2026-10-11-bounded-meetin
 One-hour synthetic renderer peak footprint fell from 987–988 MiB to 24–26 MiB;
 two-hour candidate remained about 26 MiB. This is isolated pipeline evidence,
 not a full-app or affected-hardware claim.
+
+Full local suite on the initial implementation commit
+`9b7c383299e583fdc71fb68e8c0e25d0852fcfbf`: 8086 XCTest cases (34 skipped) and
+30 Swift Testing cases passed, zero failures. The suite is not rerun for later
+review follow-ups, which rely on focused tests. PR CI and hosted review are not
+yet recorded.
