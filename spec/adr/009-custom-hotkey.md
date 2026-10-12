@@ -141,7 +141,7 @@ the key was swallowed. Dictation had matched "required modifiers are present,"
 which also tolerated the phantom fn bit on hardware F-keys. Meeting, file, and
 YouTube shortcuts already exact-matched and ignored only that phantom bit.
 
-Modifier+key chords now use that same exact match (`chordEventMatches`) for
+Modifier+key chords now use that exact match (`chordEventMatches`) for
 both starting and swallowing. Extra Control, Option, Shift, Command, or Fn
 does not fire the chord, and the key reaches the front app. A function-family
 chord that does not require fn still ignores `NX_SECONDARYFNMASK` on its own

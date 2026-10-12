@@ -62,8 +62,17 @@ final class HotkeyTapFilterTests: XCTestCase {
                 flags: command | CGEventFlags.maskShift.rawValue
             )
         )
+        // Releasing Shift during the same press must not admit the chord.
+        XCTAssertFalse(filter.shouldSwallow(type: .keyDown, keyCode: 2, flags: command))
         XCTAssertFalse(filter.shouldSwallow(type: .keyUp, keyCode: 2, flags: 0))
         XCTAssertTrue(filter.shouldSwallow(type: .keyDown, keyCode: 2, flags: command))
+        XCTAssertTrue(
+            filter.shouldSwallow(
+                type: .keyDown,
+                keyCode: 2,
+                flags: command | CGEventFlags.maskShift.rawValue
+            )
+        )
         XCTAssertTrue(filter.shouldSwallow(type: .keyUp, keyCode: 2, flags: 0))
     }
 

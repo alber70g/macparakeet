@@ -1590,6 +1590,24 @@ final class HotkeyManagerTests: XCTestCase {
         XCTAssertEqual(shifted.outputs, [])
         XCTAssertFalse(shifted.shouldSwallow)
 
+        let repeatAfterShiftReleased = manager.chordEventDecisionForTesting(
+            type: .keyDown,
+            keyCode: 2,
+            flags: trigger.chordEventFlags,
+            timestampMs: 1_050
+        )
+        XCTAssertEqual(repeatAfterShiftReleased.outputs, [])
+        XCTAssertFalse(repeatAfterShiftReleased.shouldSwallow)
+
+        let keyUp = manager.chordEventDecisionForTesting(
+            type: .keyUp,
+            keyCode: 2,
+            flags: trigger.chordEventFlags,
+            timestampMs: 1_080
+        )
+        XCTAssertEqual(keyUp.outputs, [])
+        XCTAssertFalse(keyUp.shouldSwallow)
+
         let exact = manager.chordEventDecisionForTesting(
             type: .keyDown,
             keyCode: 2,
@@ -1639,6 +1657,31 @@ final class HotkeyManagerTests: XCTestCase {
             timestampMs: 1_200
         )
         XCTAssertEqual(shiftAdded.outputs, [])
+
+        let repeated = manager.chordEventDecisionForTesting(
+            type: .keyDown,
+            keyCode: 2,
+            flags: trigger.chordEventFlags | CGEventFlags.maskShift.rawValue,
+            timestampMs: 1_250
+        )
+        XCTAssertEqual(repeated.outputs, [])
+        XCTAssertTrue(repeated.shouldSwallow)
+
+        let keyUp = manager.chordEventDecisionForTesting(
+            type: .keyUp,
+            keyCode: 2,
+            flags: trigger.chordEventFlags | CGEventFlags.maskShift.rawValue,
+            timestampMs: 1_400
+        )
+        XCTAssertEqual(
+            keyUp.outputs,
+            [
+                .cancelStartupDebounce,
+                .cancelHoldWindow,
+                .stopRecording,
+            ]
+        )
+        XCTAssertTrue(keyUp.shouldSwallow)
     }
 
     func testControlBacktickChordStartsHandsFreeDictation() {
