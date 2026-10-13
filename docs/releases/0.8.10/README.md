@@ -7,7 +7,7 @@ Preparation record for the 0.8.10 candidate. This is not a publication record. T
 
 ## Candidate
 
-- Code base: the final `origin/main` commit (at least `db8c77c46`, the #1251 merge). Record its SHA here before building, and use that merge commit's CI run as the check for the exact base. Do not build the DMG from an older `release/0.8.10` commit.
+- Code base: the final `origin/main` commit (at least `db8c77c46`, the #1251 merge). Record that exact SHA here before building, and use the CI run for that same SHA as the check for the base. Do not build the DMG from an older `release/0.8.10` commit.
 - Merged after the preparation commit (`8f6a87e20`):
   - #1247 (`911efb080`) fixes a regression introduced during this cycle. The meeting-notes status caption from #1209 (`d5ad0384f`) used vertical `fixedSize`, so opening a meeting result with notes off or missing grew the window past the screen. 0.8.9 never had the caption, so the user notes do not list it.
   - #1251 (`db8c77c46`) fixes a regression from #1243: Settings → Permissions → Screen & System Audio **Allow** did nothing after a denial. It now opens System Settings. Also not user-facing relative to 0.8.9.
