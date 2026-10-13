@@ -1604,7 +1604,7 @@ are unaffected.
   usable timing. Its replacement is explicitly untimed and is never silently
   aligned to automatic words.
 
-**Reading-view additions (development source, after 0.8.7):**
+**Reading-view additions (text editing shipped in 0.8.8; find and replace is in the 0.8.10 candidate):**
 
 - The Text view of a timed transcript has **Edit**. It opens the same passages
   for rewriting or removal, then **Done** saves them as one `reviseText`
