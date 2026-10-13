@@ -7,21 +7,22 @@ Preparation record for the 0.8.10 candidate. This is not a publication record. T
 
 ## Candidate
 
-- Base: `aead5a2c861034c585f638fa9e3338d064372039` on `origin/main`.
-- [CI on that base](https://github.com/moona3k/macparakeet/actions/runs/38211798735): tests, Swift 6, and release/bundle checks passed.
+- Code base: `abef7e56bedb84dea8dbd90892f7e475b6361367` on `origin/main`. That commit includes the Unattributed speaker label (#1241), exact dictation-chord matching (#1242), and the live-preview memory bound (#1236).
+- #1236's own CI passed before merge: tests, Swift 6, and the release bundle. The merge commit's [CI run](https://github.com/moona3k/macparakeet/actions/runs/38329495360) is the check for this exact base. Do not build the DMG from an older `release/0.8.10` commit.
 - This preparation commit bumps the bundled CLI from 5.0.0 to 5.1.0 and adds these notes. Fill in the signed commit, build number, DMG size, and SHA-256 at publication. Do not copy the 0.8.9 artifact identity forward.
 
-## Still open before or after the tag
+## Known limits
 
-- [#1228](https://github.com/moona3k/macparakeet/issues/1228) is not in this candidate. Unattributed system-track words can still appear as an extra “Others” speaker, and keeping one-word turns makes those leftovers more visible. If that fix lands before the tag, add it to `github.md` and `sparkle.html`.
-- [#1199](https://github.com/moona3k/macparakeet/issues/1199) is the 16 GB M2 Air / Teams memory report. The cleaned-mic renderer is bounded in this candidate. That measurement does not close the Air report. Release notes describe the footprint drop and do not say the freeze is fixed.
+- [#1199](https://github.com/moona3k/macparakeet/issues/1199) is the 16 GB M2 Air / Teams memory report. Cleaned-mic rendering and the during-call preview backlog are bounded in this candidate. Those measurements do not close the Air report. Release notes describe the memory bounds and do not say the freeze is fixed.
+- [#1228](https://github.com/moona3k/macparakeet/issues/1228) is fixed here. Older meetings keep their stored speaker labels until re-transcribed.
 - [#920](https://github.com/moona3k/macparakeet/issues/920), [#912](https://github.com/moona3k/macparakeet/issues/912), and [#1214](https://github.com/moona3k/macparakeet/issues/1214) remain open and are already true of 0.8.9.
+- If live preview falls behind, some live words may skip and later preview words can look early. The saved recording is kept.
 
 ## Gates
 
 Voice Control, cross-recording Ask, voice profiles, encrypted share links, and in-process MLX stay off in release builds. **0.9.0** stays reserved for qualified Voice Control.
 
-The app and CLI both default Anthropic to `claude-sonnet-5-5` and OpenRouter to `anthropic/claude-sonnet-5.5`. New Summary prompts include meeting notes in both surfaces; existing libraries keep their saved preference. Meeting URL controls default off in the app and are not a CLI command.
+The app and CLI both default Anthropic to `claude-sonnet-5-5` and OpenRouter to `anthropic/claude-sonnet-5.5`. New Summary prompts include meeting notes in both surfaces; existing libraries keep their saved preference. Meeting URL controls default off in the app and are not a CLI command. Diarized meetings label unclaimed system words Unattributed and leave them out of `speakerCount` in both surfaces.
 
 ## Not yet verified
 
