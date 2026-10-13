@@ -3706,8 +3706,8 @@ struct SettingsView: View {
 
     private var permissionsCard: some View {
         let permissionsSubtitle = AppFeatures.meetingRecordingEnabled
-            ? "Microphone is needed for dictation and microphone meetings. Accessibility is required for the global hotkey and paste. Screen Recording is needed for system-audio meetings."
-            : "Microphone is needed for dictation. Accessibility is required for the global hotkey and paste."
+            ? "Dictation and meetings use these. File transcription does not."
+            : "Dictation uses these. File transcription does not."
 
         return SettingsCard(
             title: "Permissions",
@@ -3715,65 +3715,46 @@ struct SettingsView: View {
             icon: "lock.shield",
             status: permissionsCardStatus
         ) {
-            VStack(spacing: DesignSystem.Spacing.md) {
-                HStack {
-                    rowText(
-                        title: "Microphone",
-                        detail: "Needed for dictation and microphone meetings. File transcription does not use it."
-                    )
-                    Spacer()
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                permissionStatusRow(
+                    title: "Microphone",
+                    detail: "Dictation and microphone meetings."
+                ) {
+                    if !viewModel.microphoneGranted {
+                        microphonePermissionActionButton
+                    }
                     permissionPill(granted: viewModel.microphoneGranted)
                 }
 
                 Divider()
 
-                HStack {
-                    rowText(title: "Accessibility", detail: "Required for global hotkey and paste.")
-                    Spacer()
+                permissionStatusRow(
+                    title: "Accessibility",
+                    detail: "Global hotkey and paste."
+                ) {
+                    if !viewModel.accessibilityGranted {
+                        permissionLink("Settings") {
+                            openAccessibilitySettings()
+                        }
+                    }
                     permissionPill(granted: viewModel.accessibilityGranted)
                 }
 
                 if AppFeatures.meetingRecordingEnabled {
                     Divider()
 
-                    HStack {
-                        rowText(
-                            title: "Screen & System Audio Recording",
-                            detail: "Required for meeting modes that capture system audio. MacParakeet never records your screen."
-                        )
-                        Spacer()
-                        screenRecordingPermissionPill
-                    }
-                }
-
-                let needsScreenRecordingAction = AppFeatures.meetingRecordingEnabled
-                    && viewModel.meetingAudioSourceMode.capturesSystemAudio
-                    && !viewModel.screenRecordingGranted
-                if !viewModel.microphoneGranted || !viewModel.accessibilityGranted || needsScreenRecordingAction {
-                    Divider()
-                    HStack(spacing: DesignSystem.Spacing.sm) {
-                        if !viewModel.microphoneGranted {
-                            microphonePermissionActionButton
-                        }
-
-                        if !viewModel.accessibilityGranted {
-                            Button("Open Accessibility Settings") {
-                                openAccessibilitySettings()
-                            }
-                            .parakeetAction(.primaryProminent)
-                        }
-
+                    let needsScreenRecordingAction = viewModel.meetingAudioSourceMode.capturesSystemAudio
+                        && !viewModel.screenRecordingGranted
+                    permissionStatusRow(
+                        title: "Screen & System Audio",
+                        detail: "Meetings that include other people's audio. MacParakeet does not record your screen."
+                    ) {
                         if needsScreenRecordingAction {
-                            Button("Enable meeting recording") {
+                            permissionLink("Allow") {
                                 viewModel.requestScreenRecordingAccess()
                             }
-                            .parakeetAction(.primaryProminent)
-
-                            Button("Open Screen Recording Settings") {
-                                viewModel.openScreenRecordingSystemSettings()
-                            }
-                            .parakeetAction(.secondary)
                         }
+                        screenRecordingPermissionPill
                     }
                 }
             }
@@ -3954,6 +3935,31 @@ struct SettingsView: View {
                 .font(DesignSystem.Typography.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// One row: the explanation takes the remaining width, and the status pill is
+    /// always the trailing edge so every permission lines up. A missing
+    /// permission has one quiet action immediately beside its pill.
+    private func permissionStatusRow<Accessory: View>(
+        title: String,
+        detail: String,
+        @ViewBuilder accessory: () -> Accessory
+    ) -> some View {
+        HStack(alignment: .center, spacing: DesignSystem.Spacing.md) {
+            rowText(title: title, detail: detail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(alignment: .center, spacing: 10) {
+                accessory()
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+    }
+
+    private func permissionLink(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.plain)
+            .font(DesignSystem.Typography.caption.weight(.medium))
+            .foregroundStyle(DesignSystem.Colors.accent)
     }
 
     private func metricTile(title: String, value: String, detail: String) -> some View {
@@ -4347,15 +4353,13 @@ struct SettingsView: View {
     @ViewBuilder
     private var microphonePermissionActionButton: some View {
         if viewModel.microphoneStatus == .notDetermined {
-            Button("Grant Microphone Access") {
+            permissionLink("Allow") {
                 viewModel.requestMicrophoneAccess()
             }
-            .parakeetAction(.primaryProminent)
         } else {
-            Button("Open Microphone Settings") {
+            permissionLink("Settings") {
                 viewModel.openMicrophoneSystemSettings()
             }
-            .parakeetAction(.primaryProminent)
         }
     }
 

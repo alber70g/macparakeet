@@ -814,7 +814,8 @@ struct LLMSettingsView: View {
                 Text(errorMessage)
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.warningAmber)
-                    .frame(width: 220, alignment: .leading)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 220, alignment: .trailing)
             }
         }
     }
