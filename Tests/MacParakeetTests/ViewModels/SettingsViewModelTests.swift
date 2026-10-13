@@ -1863,6 +1863,7 @@ final class SettingsViewModelTests: XCTestCase {
 
         viewModel.requestScreenRecordingAccess()
 
+        XCTAssertTrue(mockPermissions.screenRecordingPermission, "Allow must make the system request")
         XCTAssertEqual(mockPermissions.openScreenRecordingSettingsCallCount, 0)
     }
 
