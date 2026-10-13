@@ -11,7 +11,7 @@ Meetings recover more reliably, transcripts are easier to correct, and long meet
 - **Add a second dictation shortcut.** Settings → Capture → Dictation → Additional shortcuts can keep Fn on the Mac keyboard and another key on an external keyboard active together. Both pairs start off until you set them. A modifier chord matches exactly: ⌘D no longer also starts dictation for ⇧⌘D, and the extra modifier still reaches the front app.
 - **Control a recording from a link, if you turn it on.** Settings → Capture → Allow recording control from links accepts `macparakeet://meeting/start`, `pause`, `resume`, and `stop`. It is off until you enable it. Once enabled, other apps and websites can send those links.
 - **New libraries include meeting notes in Summary.** Libraries you already have keep their current Summary setting. Turn notes off per prompt if you do not want them.
-- **Claude model lists match the current lineup,** including Sonnet 5.5. Saved API keys stay put. Ordinary startup and settings checks no longer open Keychain password dialogs.
+- **Claude model lists match the current lineup,** including Sonnet 5.5. Saved API keys stay put. Ordinary startup and settings checks no longer open Keychain password dialogs. If macOS blocks access to a saved key, AI Setup says how to allow it; the key is not removed.
 - **Stopping a transcription stays stopped.** Cancelling during speaker detection or formatting no longer saves that run as a finished transcript. Deleting many Library rows no longer brings a deleted row back when the page refreshes.
 
 **If you use Anthropic or OpenRouter from the command line:** a command that omits `--model` now uses Claude Sonnet 5.5. Pass `--model` to keep an older id.
