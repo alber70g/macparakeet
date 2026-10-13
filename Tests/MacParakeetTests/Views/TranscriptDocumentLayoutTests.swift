@@ -116,6 +116,77 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
 
     }
 
+    /// A saved meeting result explains that notes were off. That caption must
+    /// wrap in the column without becoming the window's minimum height.
+    func testMeetingResultNotesStatusKeepsWindowMinimum() throws {
+        let suite = makeIsolatedDefaultsSuite("TranscriptDocumentLayoutTests.meeting-notes.")
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let transcription = Transcription(
+            fileName: "Synthetic meeting",
+            cleanTranscript: "Synthetic transcript",
+            status: .completed,
+            sourceType: .meeting
+        )
+        let model = TranscriptionViewModel(defaults: defaults)
+        model.currentTranscription = transcription
+        let results = PromptResultsViewModel()
+        let result = PromptResult(
+            transcriptionId: transcription.id,
+            promptId: UUID(),
+            promptName: "Summary",
+            promptContent: "Summarize",
+            content: "A synthetic summary that stays in the column.",
+            includeMeetingNotesSnapshot: false
+        )
+        XCTAssertEqual(result.meetingNotesStatus, PromptResultMeetingNotesStatus.off)
+        let host = Host(
+            rootView: TranscriptResultView(
+                transcription: transcription, viewModel: model,
+                chatViewModel: TranscriptChatViewModel(), promptResultsViewModel: results,
+                promptsViewModel: PromptsViewModel()
+            ).defaultAppStorage(defaults))
+        let window = NSWindow(
+            contentRect: NSRect(x: -20_000, y: -20_000, width: 1_100, height: 650),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false
+        )
+        window.contentView = host
+        window.orderFront(nil)
+        defer { window.orderOut(nil) }
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        results.promptResults = [result]
+        model.hasPromptResultTabs = true
+        model.selectedTab = .result(id: result.id)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        let minimum = window.contentMinSize
+        let content = window.contentRect(forFrameRect: window.frame)
+        print("Meeting result window minimum \(minimum), content \(content.size)")
+        XCTAssertLessThanOrEqual(
+            minimum.height, content.height,
+            "The notes status line must not raise the window minimum above the pane"
+        )
+        XCTAssertEqual(content.height, 650, accuracy: 1)
+        XCTAssertEqual(content.width, 1_100, accuracy: 1)
+        let rendered = renderedText(in: host)
+        XCTAssertTrue(
+            rendered.contains("Meeting notes are off"),
+            "The notes status must stay visible in the result column. Saw: \(rendered.prefix(400))"
+        )
+    }
+
+    private func renderedText(in view: NSView) -> String {
+        var parts: [String] = []
+        if let label = view.accessibilityLabel() { parts.append(label) }
+        if let value = view.accessibilityValue() as? String { parts.append(value) }
+        if let field = view as? NSTextField { parts.append(field.stringValue) }
+        if let textView = view as? NSTextView { parts.append(textView.string) }
+        for subview in view.subviews {
+            parts.append(renderedText(in: subview))
+        }
+        return parts.joined(separator: "\n")
+    }
+
     private func checkLayout<Content: View>(_ content: Content, width: Double, label: String) throws {
         let watchdog = DispatchWorkItem { fatalError("Document layout exceeded 120 seconds") }
         DispatchQueue.global().asyncAfter(deadline: .now() + 120, execute: watchdog)

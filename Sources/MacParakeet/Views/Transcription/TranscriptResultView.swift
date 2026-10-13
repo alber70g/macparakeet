@@ -3677,10 +3677,15 @@ struct TranscriptResultView: View {
     }
 
     private func meetingNotesStatusText(_ message: String) -> some View {
+        // Do not use vertical fixedSize. A window minimum-size pass proposes a
+        // near-zero width, and fixedSize then reports the fully wrapped height
+        // of this caption. That height becomes the window minimum and the
+        // meeting page grows past the screen.
         Text(message)
             .font(DesignSystem.Typography.caption)
             .foregroundStyle(DesignSystem.Colors.textSecondary)
-            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
