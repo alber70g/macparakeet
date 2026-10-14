@@ -116,16 +116,79 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
 
     }
 
-    /// A saved meeting result explains that notes were off. That caption must
-    /// wrap in the column without becoming the window's minimum height.
-    func testMeetingResultNotesStatusKeepsWindowMinimum() throws {
-        let suite = makeIsolatedDefaultsSuite("TranscriptDocumentLayoutTests.meeting-notes.")
+    /// Empty meeting notes leave the result page quiet. The old status caption
+    /// must not return and inflate the window minimum.
+    func testEmptyMeetingNotesLeaveTheResultPageQuiet() throws {
+        let rendered = try renderMeetingResult(currentNotes: nil, includeMeetingNotesSnapshot: false)
+        assertMeetingNotesInstructionStaysOutOfTheColumn(rendered.text)
+        assertResultWindowStaysAtOfferedSize(rendered.window)
+    }
+
+    /// A result that ignored current notes keeps the instruction out of the
+    /// column. The control shares the toolbar row, so it must not add a caption
+    /// that raises the window minimum the way the old paragraph did.
+    func testOmittedMeetingNotesStayOutOfTheResultColumn() throws {
+        let empty = try renderMeetingResult(currentNotes: nil, includeMeetingNotesSnapshot: false)
+        let omitted = try renderMeetingResult(
+            currentNotes: "Spell it Siobhan.", includeMeetingNotesSnapshot: false)
+        assertMeetingNotesInstructionStaysOutOfTheColumn(omitted.text)
+        XCTAssertFalse(empty.text.contains("Notes not included"))
+        assertResultWindowStaysAtOfferedSize(omitted.window)
+        XCTAssertEqual(
+            omitted.window.contentMinSize.height,
+            empty.window.contentMinSize.height,
+            accuracy: 8,
+            "The notes control must stay on the toolbar row instead of adding a caption"
+        )
+    }
+
+    func testSentMeetingNotesKeepASnapshotRow() throws {
+        let empty = try renderMeetingResult(currentNotes: nil, includeMeetingNotesSnapshot: false)
+        let sent = try renderMeetingResult(
+            currentNotes: "Spell it Siobhan.",
+            includeMeetingNotesSnapshot: true,
+            userNotesSnapshot: "Spell it Siobhan."
+        )
+        assertMeetingNotesInstructionStaysOutOfTheColumn(sent.text)
+        assertResultWindowStaysAtOfferedSize(sent.window)
+        XCTAssertGreaterThan(
+            sent.window.contentMinSize.height,
+            empty.window.contentMinSize.height + 16,
+            "A sent notes snapshot keeps its disclosure row"
+        )
+    }
+
+    private func assertMeetingNotesInstructionStaysOutOfTheColumn(_ text: String) {
+        XCTAssertFalse(text.contains("Meeting notes are off"))
+        XCTAssertFalse(text.contains("No meeting notes were recorded"))
+        XCTAssertFalse(text.contains("Meeting notes context was not recorded"))
+    }
+
+    private func assertResultWindowStaysAtOfferedSize(_ window: NSWindow) {
+        let minimum = window.contentMinSize
+        let content = window.contentRect(forFrameRect: window.frame)
+        print("Meeting result window minimum \(minimum), content \(content.size)")
+        XCTAssertLessThanOrEqual(
+            minimum.height, content.height,
+            "Result notes UI must not raise the window minimum above the pane"
+        )
+        XCTAssertEqual(content.height, 650, accuracy: 1)
+        XCTAssertEqual(content.width, 1_100, accuracy: 1)
+    }
+
+    private func renderMeetingResult(
+        currentNotes: String?,
+        includeMeetingNotesSnapshot: Bool,
+        userNotesSnapshot: String? = nil
+    ) throws -> (window: NSWindow, text: String) {
+        let suite = makeIsolatedDefaultsSuite("TranscriptDocumentLayoutTests.meeting-notes.\(UUID().uuidString).")
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         let transcription = Transcription(
             fileName: "Synthetic meeting",
             cleanTranscript: "Synthetic transcript",
             status: .completed,
-            sourceType: .meeting
+            sourceType: .meeting,
+            userNotes: currentNotes
         )
         let model = TranscriptionViewModel(defaults: defaults)
         model.currentTranscription = transcription
@@ -136,9 +199,9 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
             promptName: "Summary",
             promptContent: "Summarize",
             content: "A synthetic summary that stays in the column.",
-            includeMeetingNotesSnapshot: false
+            userNotesSnapshot: userNotesSnapshot,
+            includeMeetingNotesSnapshot: includeMeetingNotesSnapshot
         )
-        XCTAssertEqual(result.meetingNotesStatus, PromptResultMeetingNotesStatus.off)
         let host = Host(
             rootView: TranscriptResultView(
                 transcription: transcription, viewModel: model,
@@ -151,7 +214,6 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
         )
         window.contentView = host
         window.orderFront(nil)
-        defer { window.orderOut(nil) }
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         results.promptResults = [result]
@@ -159,28 +221,19 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
         model.selectedTab = .result(id: result.id)
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
-        let minimum = window.contentMinSize
-        let content = window.contentRect(forFrameRect: window.frame)
-        print("Meeting result window minimum \(minimum), content \(content.size)")
-        XCTAssertLessThanOrEqual(
-            minimum.height, content.height,
-            "The notes status line must not raise the window minimum above the pane"
-        )
-        XCTAssertEqual(content.height, 650, accuracy: 1)
-        XCTAssertEqual(content.width, 1_100, accuracy: 1)
-        let rendered = renderedText(in: host)
-        XCTAssertTrue(
-            rendered.contains("Meeting notes are off"),
-            "The notes status must stay visible in the result column. Saw: \(rendered.prefix(400))"
-        )
+        addTeardownBlock { window.orderOut(nil) }
+        return (window, renderedText(in: host))
     }
 
     private func renderedText(in view: NSView) -> String {
         var parts: [String] = []
-        if let label = view.accessibilityLabel() { parts.append(label) }
-        if let value = view.accessibilityValue() as? String { parts.append(value) }
+        if let label = view.accessibilityLabel(), !label.isEmpty { parts.append(label) }
+        if let value = view.accessibilityValue() as? String, !value.isEmpty { parts.append(value) }
+        let identifier = view.accessibilityIdentifier()
+        if !identifier.isEmpty { parts.append(identifier) }
         if let field = view as? NSTextField { parts.append(field.stringValue) }
         if let textView = view as? NSTextView { parts.append(textView.string) }
+        if let button = view as? NSButton, !button.title.isEmpty { parts.append(button.title) }
         for subview in view.subviews {
             parts.append(renderedText(in: subview))
         }
