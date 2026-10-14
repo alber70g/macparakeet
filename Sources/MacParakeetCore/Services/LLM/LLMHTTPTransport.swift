@@ -39,10 +39,9 @@ extension LLMHTTPAdapter {
 
 enum LLMHTTPRequestTimeout {
     /// Non-streaming calls receive no body bytes until generation finishes, so
-    /// this is the full wait. Cleanup rewrites about as much text as it reads,
-    /// and the transcript formatter still sends up to 20k characters. A 30s
-    /// wait ended those requests mid-generation (#1253). 300s is the budget
-    /// local providers and the #493 length cap already assumed.
+    /// this is the full wait. Each cleanup section is at most 12,000 characters.
+    /// A 30s wait ended longer rewrites mid-generation (#1253). 300s is the
+    /// budget local providers already use.
     static let cloudNonStreaming: TimeInterval = 300
     static let cloudStreamingIdle: TimeInterval = 120
     static let localNonStreaming: TimeInterval = 300

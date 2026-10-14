@@ -6,6 +6,7 @@ import XCTest
 final class MockLLMClient: LLMClientProtocol, @unchecked Sendable {
     var supportsInProcessLocalLLM = true
     var capturedMessages: [ChatMessage] = []
+    var capturedMessageBatches: [[ChatMessage]] = []
     var capturedContext: LLMExecutionContext?
     var capturedOptions: ChatCompletionOptions?
     var responseContent = "Mock response"
@@ -31,6 +32,7 @@ final class MockLLMClient: LLMClientProtocol, @unchecked Sendable {
     ) async throws -> ChatCompletionResponse {
         chatCompletionCallCount += 1
         capturedMessages = messages
+        capturedMessageBatches.append(messages)
         capturedContext = context
         capturedOptions = options
         if let chatCompletionError { throw chatCompletionError }
@@ -1086,10 +1088,24 @@ final class LLMServiceTests: XCTestCase {
             defaultPromptUsed: true
         )
 
-        let maxTokens = try XCTUnwrap(mockClient.capturedOptions?.maxTokens)
-        XCTAssertGreaterThan(maxTokens, 4096)
-        XCTAssertLessThanOrEqual(maxTokens, 16_384)
-        XCTAssertEqual(maxTokens, LLMService.formatterMaxSectionCharacters / 3 + 256)
+        XCTAssertEqual(mockClient.capturedOptions?.maxTokens, LLMService.formatterMaximumOutputTokenLimit)
+    }
+
+    func testFormatTranscriptLeavesOutputLimitUnsetForGPT5Sections() async throws {
+        mockConfigStore.config = .openai(apiKey: "test-key", model: "gpt-5.5")
+        mockClient.responseContent = "Cleaned."
+        mockClient.responseFinishReason = "stop"
+        let transcript = String(repeating: "a", count: LLMService.formatterMaxSectionCharacters)
+
+        _ = try await service.formatTranscriptDetailed(
+            transcript: transcript,
+            promptTemplate: AIFormatter.defaultPromptTemplate,
+            source: .transcription,
+            defaultPromptUsed: true
+        )
+
+        XCTAssertEqual(mockClient.chatCompletionCallCount, 1)
+        XCTAssertNil(mockClient.capturedOptions?.maxTokens)
     }
 
     func testFormatterSectionsBreakOnParagraphsWordsAndHardCuts() {
@@ -1477,30 +1493,41 @@ final class LLMServiceTests: XCTestCase {
         XCTAssertEqual(mockClient.chatCompletionStreamCallCount, 0)
     }
 
-    func testAppleIntelligenceFormatterRejectsOversizedInput() async throws {
+    func testAppleIntelligenceFormatterSectionsOversizedInputInsideRoundTripBudget() async throws {
         mockConfigStore.config = .appleIntelligence()
         let telemetry = LLMTelemetrySpy()
         Telemetry.configure(telemetry)
-        do {
-            _ = try await service.formatTranscriptDetailed(
-                transcript: String(repeating: "word ", count: 2_000),
-                promptTemplate: AIFormatter.defaultPromptTemplate,
-                source: .transcription, defaultPromptUsed: true
-            )
-            XCTFail("Expected oversized formatter input to fail")
-        } catch LLMError.formatterTruncated {
-            XCTAssertEqual(mockClient.chatCompletionCallCount, 0)
+        mockClient.responseContent = "Cleaned."
+        mockClient.responseFinishReason = "stop"
+
+        let result = try await service.formatTranscriptDetailed(
+            transcript: String(repeating: "word ", count: 2_000),
+            promptTemplate: AIFormatter.defaultPromptTemplate,
+            source: .transcription, defaultPromptUsed: true
+        )
+
+        XCTAssertGreaterThan(mockClient.chatCompletionCallCount, 1)
+        XCTAssertFalse(mockClient.capturedMessageBatches.isEmpty)
+        for batch in mockClient.capturedMessageBatches {
+            let rendered = batch.reduce(0) { $0 + $1.content.count }
+            XCTAssertLessThanOrEqual(rendered, LLMService.appleIntelligenceRoundTripBudget)
         }
+        XCTAssertEqual(
+            result.output,
+            Array(repeating: "Cleaned.", count: mockClient.chatCompletionCallCount).joined(separator: "\n\n")
+        )
         let events = telemetry.snapshot()
         XCTAssertTrue(
             events.contains {
-                if case .llmFormatterFailed = $0 { return true }; return false
+                if case .llmFormatterUsed = $0 { return true }
+                return false
             })
         XCTAssertFalse(
             events.contains {
-                if case .llmFormatterUsed = $0 { return true }; return false
+                if case .llmFormatterFailed = $0 { return true }
+                return false
             })
-        XCTAssertFalse(llmOperationProps(in: events).contains { $0["outcome"] == "success" })
+        XCTAssertTrue(llmOperationProps(in: events).contains { $0["outcome"] == "success" })
     }
 
     func testFormatterCancellationPropagatesFromProvider() async throws {

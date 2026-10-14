@@ -327,18 +327,18 @@ public final class LLMService: LLMServiceProtocol, Sendable {
     /// allowance or the provider stops at `max_tokens` and the partial text
     /// is discarded.
     static let formatterInheritedOutputTokenLimit = 4_096
-    /// Stays inside the output window of the current Claude defaults while
-    /// covering the 20k-character transcription cap (~7k tokens at 3 chars/token).
+    /// Ceiling for an Anthropic section that no longer fits the inherited
+    /// 4096-token default. Current Claude defaults accept this output window.
     static let formatterMaximumOutputTokenLimit = 16_384
 
-    /// `nil` keeps the provider default. Above the inherited 4096, size the
-    /// allowance to the transcript. 3 characters per token is the conservative
-    /// side of the English estimate used for context budgets, plus a margin
-    /// for paragraph breaks.
+    /// `nil` keeps the provider default. Anthropic turns a missing value into
+    /// 4096, so a section past that estimate asks for the ceiling instead of a
+    /// tight count. Other providers, including GPT-5 where the same field
+    /// counts reasoning tokens, are left unset.
     static func formatterOutputTokenLimit(transcriptChars: Int) -> Int? {
         let estimated = max(0, transcriptChars) / 3 + 256
         guard estimated > formatterInheritedOutputTokenLimit else { return nil }
-        return min(estimated, formatterMaximumOutputTokenLimit)
+        return formatterMaximumOutputTokenLimit
     }
 
     /// One cleanup section has to finish inside the 300-second body wait and
@@ -1764,12 +1764,15 @@ public final class LLMService: LLMServiceProtocol, Sendable {
                 )
             )
         }
+        let maxTokens =
+            context.providerConfig.id == .anthropic
+            ? Self.formatterOutputTokenLimit(transcriptChars: section.count) : nil
         return try await client.chatCompletion(
             messages: messages,
             context: context,
             options: ChatCompletionOptions(
                 temperature: ChatCompletionOptions.default.temperature,
-                maxTokens: Self.formatterOutputTokenLimit(transcriptChars: section.count)
+                maxTokens: maxTokens
             )
         )
     }
