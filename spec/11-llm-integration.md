@@ -472,6 +472,7 @@ public protocol LLMServiceProtocol: Sendable {
 public enum LLMError: Error, LocalizedError, Sendable {
     case notConfigured             // No provider set up
     case connectionFailed(String)  // Network/localhost unreachable
+    case requestTimedOut           // Provider sent no bytes before the idle timeout
     case authenticationFailed      // Invalid API key
     case cliError(String)          // Local CLI subprocess failure
     case rateLimited               // Provider rate limit

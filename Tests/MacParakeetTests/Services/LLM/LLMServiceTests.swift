@@ -1059,6 +1059,39 @@ final class LLMServiceTests: XCTestCase {
         XCTAssertEqual(operations.first?["feature"], TelemetryLLMFeature.formatter.rawValue)
     }
 
+    func testFormatTranscriptLeavesOutputTokenLimitUnsetForShortTranscripts() async throws {
+        mockClient.responseContent = "Hello."
+        mockClient.responseFinishReason = "stop"
+
+        _ = try await service.formatTranscriptDetailed(
+            transcript: "hello world",
+            promptTemplate: AIFormatter.defaultPromptTemplate,
+            source: .dictation,
+            defaultPromptUsed: true
+        )
+
+        XCTAssertNil(mockClient.capturedOptions?.maxTokens)
+    }
+
+    func testFormatTranscriptSizesOutputTokensToALongTranscript() async throws {
+        mockConfigStore.config = .anthropic(apiKey: "test-key", model: "claude-fable-5")
+        mockClient.responseContent = "Cleaned transcript."
+        mockClient.responseFinishReason = "end_turn"
+        let transcript = String(repeating: "a", count: 15_000)
+
+        _ = try await service.formatTranscriptDetailed(
+            transcript: transcript,
+            promptTemplate: AIFormatter.defaultPromptTemplate,
+            source: .transcription,
+            defaultPromptUsed: true
+        )
+
+        let maxTokens = try XCTUnwrap(mockClient.capturedOptions?.maxTokens)
+        XCTAssertGreaterThan(maxTokens, 4096)
+        XCTAssertLessThanOrEqual(maxTokens, 16_384)
+        XCTAssertEqual(maxTokens, 15_000 / 3 + 256)
+    }
+
     func testFormatterRejectsRenderedRequestsOverBudgetWithoutCallingProvider() async throws {
         mockConfigStore.config = .appleIntelligence()
         // Obtain the real system overhead from one small request.

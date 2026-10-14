@@ -322,6 +322,24 @@ public final class LLMService: LLMServiceProtocol, Sendable {
     /// Transforms and dictation cleanup answer at about the length of the source.
     /// Half the window, in the same character unit, leaves room for that rewrite.
     internal static let appleIntelligenceRoundTripBudget = 6_000
+    /// Anthropic sends this when `maxTokens` is omitted. A cleanup rewrite is
+    /// about as long as the source, so a longer transcript needs an explicit
+    /// allowance or the provider stops at `max_tokens` and the partial text
+    /// is discarded.
+    static let formatterInheritedOutputTokenLimit = 4_096
+    /// Stays inside the output window of the current Claude defaults while
+    /// covering the 20k-character transcription cap (~7k tokens at 3 chars/token).
+    static let formatterMaximumOutputTokenLimit = 16_384
+
+    /// `nil` keeps the provider default. Above the inherited 4096, size the
+    /// allowance to the transcript. 3 characters per token is the conservative
+    /// side of the English estimate used for context budgets, plus a margin
+    /// for paragraph breaks.
+    static func formatterOutputTokenLimit(transcriptChars: Int) -> Int? {
+        let estimated = max(0, transcriptChars) / 3 + 256
+        guard estimated > formatterInheritedOutputTokenLimit else { return nil }
+        return min(estimated, formatterMaximumOutputTokenLimit)
+    }
 
     /// Largest output-token request that still leaves input under the
     /// ceil(3.5 characters per token) reservation used by prompt results.
@@ -930,7 +948,14 @@ public final class LLMService: LLMServiceProtocol, Sendable {
                 let formatted = parseLMStudioFormattedTranscript(response) ?? response.content
                 output = AIFormatter.normalizedFormattedOutput(formatted)
             } else {
-                response = try await client.chatCompletion(messages: messages, context: context, options: .default)
+                response = try await client.chatCompletion(
+                    messages: messages,
+                    context: context,
+                    options: ChatCompletionOptions(
+                        temperature: ChatCompletionOptions.default.temperature,
+                        maxTokens: Self.formatterOutputTokenLimit(transcriptChars: transcript.count)
+                    )
+                )
                 output = AIFormatter.normalizedFormattedOutput(response.content)
             }
 
@@ -1663,7 +1688,8 @@ public final class LLMService: LLMServiceProtocol, Sendable {
         switch llmError {
         case .connectionFailed, .modelNotFound, .cliError, .authenticationFailed:
             return true
-        case .notConfigured, .invalidModelOverride, .rateLimited, .contextTooLong, .contentFiltered,
+        case .notConfigured, .requestTimedOut, .invalidModelOverride, .rateLimited, .contextTooLong,
+            .contentFiltered,
             .formatterTruncated,
             .formatterEmptyResponse, .providerError, .streamingError, .invalidResponse:
             return false

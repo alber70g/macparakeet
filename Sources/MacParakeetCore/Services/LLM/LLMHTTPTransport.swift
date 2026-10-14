@@ -37,6 +37,18 @@ extension LLMHTTPAdapter {
     }
 }
 
+enum LLMHTTPRequestTimeout {
+    /// Non-streaming calls receive no body bytes until generation finishes, so
+    /// this is the full wait. Cleanup rewrites about as much text as it reads,
+    /// and the transcript formatter still sends up to 20k characters. A 30s
+    /// wait ended those requests mid-generation (#1253). 300s is the budget
+    /// local providers and the #493 length cap already assumed.
+    static let cloudNonStreaming: TimeInterval = 300
+    static let cloudStreamingIdle: TimeInterval = 120
+    static let localNonStreaming: TimeInterval = 300
+    static let localStreamingIdle: TimeInterval = 600
+}
+
 struct LLMHTTPTransport: Sendable {
     private let session: URLSession
 
@@ -48,7 +60,7 @@ struct LLMHTTPTransport: Sendable {
         do {
             return try await session.data(for: request, delegate: OpenCodeRequestHeaders.redirectDelegate(for: request))
         } catch {
-            throw LLMError.connectionFailed(error.localizedDescription)
+            throw Self.mapTransportFailure(error)
         }
     }
 
@@ -57,8 +69,33 @@ struct LLMHTTPTransport: Sendable {
             return try await session.bytes(
                 for: request, delegate: OpenCodeRequestHeaders.redirectDelegate(for: request))
         } catch {
-            throw LLMError.connectionFailed(error.localizedDescription)
+            throw Self.mapTransportFailure(error)
         }
+    }
+
+    static func mapTransportFailure(_ error: Error) -> LLMError {
+        if isRequestTimeout(error) {
+            return .requestTimedOut
+        }
+        return .connectionFailed(error.localizedDescription)
+    }
+
+    /// URLSession reports an idle timeout as `URLError.timedOut` (-1001),
+    /// sometimes wrapped in an underlying `NSError`.
+    private static func isRequestTimeout(_ error: Error, inspectUnderlying: Bool = true) -> Bool {
+        if let urlError = error as? URLError, urlError.code == .timedOut {
+            return true
+        }
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain, nsError.code == URLError.Code.timedOut.rawValue {
+            return true
+        }
+        guard inspectUnderlying,
+            let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error
+        else {
+            return false
+        }
+        return isRequestTimeout(underlying, inspectUnderlying: false)
     }
 }
 
