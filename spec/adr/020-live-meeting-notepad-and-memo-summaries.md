@@ -22,7 +22,7 @@ no context block. Saved-result replay semantics remain unchanged.
 The meeting generation popover now states whether the selected prompt will include
 notes and points to **Manage Prompts → expand the prompt → Include meeting notes
 as context** when disabled. Saved meeting results expose their recorded notes
-snapshot when present. The result page stays quiet when the meeting's current
+snapshot when present. The omission notice stays quiet when the meeting's current
 notes are empty. When current notes are non-empty and the result did not use
 them, a quiet **Notes not included** control explains the remedy in a popover.
 A library-prompt result with notes disabled directs users to generate a **new**

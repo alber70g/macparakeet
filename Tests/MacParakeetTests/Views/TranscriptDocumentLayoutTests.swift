@@ -132,6 +132,7 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
         let omitted = try renderMeetingResult(
             currentNotes: "Spell it Siobhan.", includeMeetingNotesSnapshot: false)
         assertMeetingNotesInstructionStaysOutOfTheColumn(omitted.text)
+        XCTAssertFalse(empty.text.contains("Notes not included"))
         assertResultWindowStaysAtOfferedSize(omitted.window)
         XCTAssertEqual(
             omitted.window.contentMinSize.height,
@@ -226,10 +227,13 @@ final class TranscriptDocumentLayoutTests: XCTestCase {
 
     private func renderedText(in view: NSView) -> String {
         var parts: [String] = []
-        if let label = view.accessibilityLabel() { parts.append(label) }
-        if let value = view.accessibilityValue() as? String { parts.append(value) }
+        if let label = view.accessibilityLabel(), !label.isEmpty { parts.append(label) }
+        if let value = view.accessibilityValue() as? String, !value.isEmpty { parts.append(value) }
+        let identifier = view.accessibilityIdentifier()
+        if !identifier.isEmpty { parts.append(identifier) }
         if let field = view as? NSTextField { parts.append(field.stringValue) }
         if let textView = view as? NSTextView { parts.append(textView.string) }
+        if let button = view as? NSButton, !button.title.isEmpty { parts.append(button.title) }
         for subview in view.subviews {
             parts.append(renderedText(in: subview))
         }
