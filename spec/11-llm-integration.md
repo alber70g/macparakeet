@@ -750,9 +750,9 @@ transcription formatting continues to use the transcript formatter prompt
 (all transcription finalization paths share `completeTranscription`, which
 invokes the formatter). Dictation uses the dictation formatter prompt as
 its fallback after profiles/smart defaults. The transcripts-side formatter
-has its own "Use for transcripts" toggle (default off) and an input-length
-cap that skips formatting for transcripts too long to rewrite inside
-realistic provider timeouts (#493).
+has its own "Use for transcripts" toggle (default off). A transcript longer
+than one provider response is cleaned in successive sections and joined,
+instead of being skipped (#493, #1253).
 
 Browser hostname/domain matching is intentionally deferred. In V1, Gmail in
 Chrome can match an exact Chrome profile or the coarse `browser` category, but

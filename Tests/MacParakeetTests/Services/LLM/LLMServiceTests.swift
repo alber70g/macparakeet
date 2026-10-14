@@ -1077,7 +1077,7 @@ final class LLMServiceTests: XCTestCase {
         mockConfigStore.config = .anthropic(apiKey: "test-key", model: "claude-fable-5")
         mockClient.responseContent = "Cleaned transcript."
         mockClient.responseFinishReason = "end_turn"
-        let transcript = String(repeating: "a", count: 15_000)
+        let transcript = String(repeating: "a", count: LLMService.formatterMaxSectionCharacters)
 
         _ = try await service.formatTranscriptDetailed(
             transcript: transcript,
@@ -1089,7 +1089,44 @@ final class LLMServiceTests: XCTestCase {
         let maxTokens = try XCTUnwrap(mockClient.capturedOptions?.maxTokens)
         XCTAssertGreaterThan(maxTokens, 4096)
         XCTAssertLessThanOrEqual(maxTokens, 16_384)
-        XCTAssertEqual(maxTokens, 15_000 / 3 + 256)
+        XCTAssertEqual(maxTokens, LLMService.formatterMaxSectionCharacters / 3 + 256)
+    }
+
+    func testFormatterSectionsBreakOnParagraphsWordsAndHardCuts() {
+        let paragraphs = String(repeating: "a", count: 10) + "\n\n" + String(repeating: "b", count: 10)
+        XCTAssertEqual(
+            LLMService.formatterSections(of: paragraphs, limit: 12),
+            [String(repeating: "a", count: 10), String(repeating: "b", count: 10)]
+        )
+        XCTAssertEqual(
+            LLMService.formatterSections(of: "alpha beta gamma", limit: 8),
+            ["alpha", "beta", "gamma"]
+        )
+        XCTAssertEqual(
+            LLMService.formatterSections(of: String(repeating: "a", count: 5), limit: 2),
+            ["aa", "aa", "a"]
+        )
+    }
+
+    func testFormatTranscriptCleansALongTranscriptInSections() async throws {
+        mockClient.responseContent = "Cleaned."
+        mockClient.responseFinishReason = "end_turn"
+        mockClient.responseUsage = TokenUsage(promptTokens: 10, completionTokens: 4)
+        let transcript = String(repeating: "word ", count: 3_000)
+
+        let result = try await service.formatTranscriptDetailed(
+            transcript: transcript,
+            promptTemplate: AIFormatter.defaultPromptTemplate,
+            source: .transcription,
+            defaultPromptUsed: true
+        )
+
+        XCTAssertEqual(mockClient.chatCompletionCallCount, 2)
+        XCTAssertEqual(result.output, "Cleaned.\n\nCleaned.")
+        XCTAssertEqual(result.result.usage?.promptTokens, 20)
+        XCTAssertEqual(result.result.usage?.completionTokens, 8)
+        XCTAssertEqual(result.messageCount, 4)
+        XCTAssertFalse(mockClient.capturedMessages.last?.content.contains(transcript) ?? true)
     }
 
     func testFormatterRejectsRenderedRequestsOverBudgetWithoutCallingProvider() async throws {
@@ -1101,12 +1138,7 @@ final class LLMServiceTests: XCTestCase {
         )
         let available = LLMService.appleIntelligenceRoundTripBudget - mockClient.capturedMessages[0].content.count
         let cases = [
-            (String(repeating: "x", count: available + 1), AIFormatter.transcriptPlaceholder),
             ("x", String(repeating: "p", count: available) + AIFormatter.transcriptPlaceholder),
-            (
-                String(repeating: "x", count: available / 2 + 1),
-                AIFormatter.transcriptPlaceholder + AIFormatter.transcriptPlaceholder
-            ),
             ("x", String(repeating: "p", count: available - 1)),
         ]
         for (transcript, template) in cases {

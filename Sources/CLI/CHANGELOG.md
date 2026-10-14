@@ -102,6 +102,8 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
 - Non-streaming cloud LLM requests wait 300 seconds for the response body,
   matching local providers. AI cleanup of a transcript longer than about
   seven minutes was failing at 30 seconds.
+- AI cleanup of a long transcript is sent in sections of at most 12,000
+  characters and joined. Meetings are no longer skipped at 20,000 characters.
 
 ## [5.1.0] — 2026-10-12 (bundled with MacParakeet 0.8.10)
 
