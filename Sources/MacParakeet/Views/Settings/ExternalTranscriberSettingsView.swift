@@ -61,7 +61,8 @@ struct ExternalTranscriberSettingsView: View {
                             get: { timeoutSeconds / 60 },
                             set: { timeoutSeconds = ExternalTranscriberConfiguration.clampedTimeout($0 * 60) }
                         ),
-                        in: (ExternalTranscriberConfiguration.minimumTimeoutSeconds / 60)...(ExternalTranscriberConfiguration.maximumTimeoutSeconds / 60),
+                        in: (ExternalTranscriberConfiguration.minimumTimeoutSeconds / 60)...(ExternalTranscriberConfiguration
+                            .maximumTimeoutSeconds / 60),
                         step: 5
                     )
                     .fixedSize()

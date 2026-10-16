@@ -58,7 +58,8 @@ public struct ExternalSpeakerNaming: Sendable, Equatable {
         guard let transcript = try? ExternalTranscript.load(fromFolder: outputFolder) else { return nil }
         let ids = transcript.speakers.map(\.id)
         let files = sampleFiles(in: outputFolder, ids: ids)
-            .merging(sampleFiles(in: outputFolder.appendingPathComponent(droppedFolderName), ids: ids)) { top, _ in top }
+            .merging(sampleFiles(in: outputFolder.appendingPathComponent(droppedFolderName), ids: ids)) { top, _ in top
+            }
         let speakers = transcript.speakers.map { speaker in
             Speaker(
                 externalID: speaker.id,
@@ -77,7 +78,9 @@ public struct ExternalSpeakerNaming: Sendable, Equatable {
         let sortedIDs = ids.sorted { $0.count > $1.count }
         var files: [String: URL] = [:]
         for name in names.sorted() where name.lowercased().hasSuffix(".wav") {
-            guard let id = sortedIDs.first(where: { name.hasPrefix($0 + separator) }), files[id] == nil else { continue }
+            guard let id = sortedIDs.first(where: { name.hasPrefix($0 + separator) }), files[id] == nil else {
+                continue
+            }
             files[id] = folder.appendingPathComponent(name)
         }
         return files
@@ -85,7 +88,8 @@ public struct ExternalSpeakerNaming: Sendable, Equatable {
 
     /// Same rules as paraspeakrs's own `_safe`.
     public static func safeName(_ name: String) -> String {
-        let cleaned = name
+        let cleaned =
+            name
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: "\0", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -136,7 +140,9 @@ extension ExternalSpeakerNaming {
         return targets
     }
 
-    private static func mostFrequentSpeaker(in assignments: [SpeakerAssignment], preferring preferred: String) -> String? {
+    private static func mostFrequentSpeaker(in assignments: [SpeakerAssignment], preferring preferred: String)
+        -> String?
+    {
         var counts: [String: Int] = [:]
         for case .speaker(let id) in assignments { counts[id, default: 0] += 1 }
         if let preferredCount = counts[preferred], preferredCount == counts.values.max() { return preferred }
@@ -155,7 +161,9 @@ extension ExternalSpeakerNaming {
         case .unnamed:
             return outputFolder.appendingPathComponent(prefix + Self.unnamed + ".wav")
         case .dropped:
-            let name = speaker.isDropped ? sampleURL.lastPathComponent : prefix + (speaker.currentName ?? Self.unnamed) + ".wav"
+            let name =
+                speaker.isDropped
+                ? sampleURL.lastPathComponent : prefix + (speaker.currentName ?? Self.unnamed) + ".wav"
             return outputFolder.appendingPathComponent(Self.droppedFolderName).appendingPathComponent(name)
         }
     }

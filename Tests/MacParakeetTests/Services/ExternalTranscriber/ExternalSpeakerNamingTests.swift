@@ -9,6 +9,9 @@ import XCTest
 final class ExternalSpeakerNamingTests: XCTestCase {
     private var meetingFolder: URL!
     private var outputFolder: URL!
+    /// Built once: `materializeSegments` assigns fresh segment IDs per call,
+    /// and correction targets must anchor to the same transcript they replay on.
+    private var cachedMeeting: Transcription?
 
     override func setUpWithError() throws {
         meetingFolder = FileManager.default.temporaryDirectory
@@ -50,9 +53,10 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     func testRenameNamesTheSample() throws {
         let naming = try XCTUnwrap(ExternalSpeakerNaming.load(meetingFolder: meetingFolder))
 
-        let targets = naming.plan(attribution: try resolve([
-            .rename(speakerID: "external:R_SPEAKER_00", label: "Randy"),
-        ]))
+        let targets = naming.plan(
+            attribution: try resolve([
+                .rename(speakerID: "external:R_SPEAKER_00", label: "Randy")
+            ]))
 
         XCTAssertEqual(targets["R_SPEAKER_00"], .named("Randy"))
         XCTAssertTrue(try naming.applyFileMoves(targets))
@@ -63,9 +67,10 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     func testRenamingASuggestedSpeakerReplacesTheGuess() throws {
         let naming = try XCTUnwrap(ExternalSpeakerNaming.load(meetingFolder: meetingFolder))
 
-        let targets = naming.plan(attribution: try resolve([
-            .rename(speakerID: "external:L_SPEAKER_00", label: "Steven"),
-        ]))
+        let targets = naming.plan(
+            attribution: try resolve([
+                .rename(speakerID: "external:L_SPEAKER_00", label: "Steven")
+            ]))
 
         XCTAssertEqual(targets["L_SPEAKER_00"], .named("Steven"))
     }
@@ -73,9 +78,10 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     func testMergeGivesBothSamplesTheTargetName() throws {
         let naming = try XCTUnwrap(ExternalSpeakerNaming.load(meetingFolder: meetingFolder))
 
-        let targets = naming.plan(attribution: try resolve([
-            .merge(sourceSpeakerID: "external:R_SPEAKER_00", targetSpeakerID: "external:L_SPEAKER_00"),
-        ]))
+        let targets = naming.plan(
+            attribution: try resolve([
+                .merge(sourceSpeakerID: "external:R_SPEAKER_00", targetSpeakerID: "external:L_SPEAKER_00")
+            ]))
 
         // The same name on two samples is how paraspeakrs merges speakers.
         XCTAssertEqual(targets["R_SPEAKER_00"], .named("Albert"))
@@ -87,10 +93,11 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         let omissions = automatic.editableSegments
             .filter { $0.assignment == .speaker(id: "external:R_SPEAKER_00") }
             .map {
-                TranscriptTextChange.omit(target: SpeakerCorrectionTarget(
-                    anchorTranscriptSegmentIDs: $0.anchorTranscriptSegmentIDs,
-                    wordRange: $0.wordRange
-                ))
+                TranscriptTextChange.omit(
+                    target: SpeakerCorrectionTarget(
+                        anchorTranscriptSegmentIDs: $0.anchorTranscriptSegmentIDs,
+                        wordRange: $0.wordRange
+                    ))
             }
 
         // The exact pair the Drop action commits: omit the lines, then remove
@@ -138,8 +145,9 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     }
 
     private func meeting() throws -> Transcription {
+        if let cachedMeeting { return cachedMeeting }
         let imported = try ExternalTranscript.decode(Data(ExternalTranscriptTests.sampleJSON.utf8)).imported()
-        return Transcription(
+        let transcription = Transcription(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!,
             fileName: "Meeting",
             meetingArtifactFolderPath: meetingFolder.path,
@@ -155,6 +163,8 @@ final class ExternalSpeakerNamingTests: XCTestCase {
             sourceType: .meeting,
             engine: ExternalTranscriberConfiguration.engineName
         )
+        cachedMeeting = transcription
+        return transcription
     }
 
     private func resolve(_ commands: [SpeakerCorrectionCommand]) throws -> EffectiveSpeakerAttribution {
@@ -162,14 +172,15 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         let fingerprint = SpeakerAttributionResolver.fingerprint(for: transcription)
         var corrections: [SpeakerCorrection] = []
         for (index, command) in commands.enumerated() {
-            corrections.append(SpeakerCorrection(
-                transcriptionId: transcription.id,
-                parentId: corrections.last?.id,
-                sequence: index + 1,
-                transcriptFingerprint: fingerprint,
-                payload: command,
-                createdAt: Date(timeIntervalSince1970: TimeInterval(index))
-            ))
+            corrections.append(
+                SpeakerCorrection(
+                    transcriptionId: transcription.id,
+                    parentId: corrections.last?.id,
+                    sequence: index + 1,
+                    transcriptFingerprint: fingerprint,
+                    payload: command,
+                    createdAt: Date(timeIntervalSince1970: TimeInterval(index))
+                ))
         }
         let attribution = SpeakerAttributionResolver.resolve(
             transcription: transcription,

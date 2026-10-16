@@ -97,7 +97,9 @@ public final class ExternalTranscriberRunner: ExternalTranscriberRunning {
         let startedAt = Date()
         do {
             _ = try await executor.runCommand(command, environment: environment, timeout: timeout)
-            logger.info("external_transcriber_command_completed duration_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000), privacy: .public)")
+            logger.info(
+                "external_transcriber_command_completed duration_ms=\(Int(Date().timeIntervalSince(startedAt) * 1000), privacy: .public)"
+            )
         } catch let error as LocalCLIError {
             logger.error("external_transcriber_command_failed error=\(error.localizedDescription, privacy: .private)")
             switch error {

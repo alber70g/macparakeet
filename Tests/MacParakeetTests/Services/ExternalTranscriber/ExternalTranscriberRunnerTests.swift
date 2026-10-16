@@ -27,10 +27,10 @@ final class ExternalTranscriberRunnerTests: XCTestCase {
         let output = root.appendingPathComponent("external-transcript")
         let meetingID = UUID()
         let command = """
-        test -f "$MACPARAKEET_AUDIO" && test "$MACPARAKEET_MEETING_ID" = "\(meetingID.uuidString)" \
-        && printf '%s' '{"version":1,"speakers":[{"id":"A"}],"segments":[{"speaker":"A","start":0,"end":1,"text":"Hi","words":[{"word":"Hi","start":0,"end":1}]}]}' \
-        > "$MACPARAKEET_OUT_DIR/transcript.json"
-        """
+            test -f "$MACPARAKEET_AUDIO" && test "$MACPARAKEET_MEETING_ID" = "\(meetingID.uuidString)" \
+            && printf '%s' '{"version":1,"speakers":[{"id":"A"}],"segments":[{"speaker":"A","start":0,"end":1,"text":"Hi","words":[{"word":"Hi","start":0,"end":1}]}]}' \
+            > "$MACPARAKEET_OUT_DIR/transcript.json"
+            """
 
         let transcript = try await ExternalTranscriberRunner().transcribe(
             audioURL: audio,
@@ -49,7 +49,8 @@ final class ExternalTranscriberRunnerTests: XCTestCase {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         try Data("old".utf8).write(to: output.appendingPathComponent("stale.wav"))
         // paraspeakrs refuses a non-empty folder; the retry must start clean.
-        let command = #"test -z "$(ls -A "$MACPARAKEET_OUT_DIR")" && printf '{"version":1,"speakers":[],"segments":[]}' > "$MACPARAKEET_OUT_DIR/transcript.json""#
+        let command =
+            #"test -z "$(ls -A "$MACPARAKEET_OUT_DIR")" && printf '{"version":1,"speakers":[],"segments":[]}' > "$MACPARAKEET_OUT_DIR/transcript.json""#
 
         _ = try await ExternalTranscriberRunner().transcribe(
             audioURL: root.appendingPathComponent("a.m4a"),

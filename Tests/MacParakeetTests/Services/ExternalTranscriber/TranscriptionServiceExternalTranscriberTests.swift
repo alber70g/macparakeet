@@ -133,8 +133,12 @@ final class TranscriptionServiceExternalTranscriberTests: XCTestCase {
             durationSeconds: 10,
             sourceAlignment: MeetingSourceAlignment(
                 meetingOriginHostTime: nil,
-                microphone: .init(firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 48_000, sampleRate: 48_000),
-                system: .init(firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 48_000, sampleRate: 48_000)
+                microphone: .init(
+                    firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 48_000,
+                    sampleRate: 48_000),
+                system: .init(
+                    firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 48_000,
+                    sampleRate: 48_000)
             )
         )
     }

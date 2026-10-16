@@ -85,7 +85,8 @@ public enum ExternalTranscriberPreset: String, CaseIterable, Sendable {
         switch self {
         case .paraspeakrs:
             // fp32 avoids paraspeakrs's interactive precision question on a first run.
-            return #"paraspeakrs agent transcribe "$MACPARAKEET_AUDIO" -o "$MACPARAKEET_OUT_DIR" --sherpa-precision fp32"#
+            return
+                #"paraspeakrs agent transcribe "$MACPARAKEET_AUDIO" -o "$MACPARAKEET_OUT_DIR" --sherpa-precision fp32"#
         }
     }
 

@@ -61,7 +61,8 @@ public struct ExternalTranscript: Codable, Sendable, Equatable {
             case .invalid(let detail):
                 return "The external transcriber wrote an unreadable transcript.json: \(detail)"
             case .unsupportedVersion(let version):
-                return "The external transcriber wrote transcript.json version \(version); version \(ExternalTranscript.supportedVersion) is supported."
+                return
+                    "The external transcriber wrote transcript.json version \(version); version \(ExternalTranscript.supportedVersion) is supported."
             }
         }
     }
@@ -134,9 +135,10 @@ extension ExternalTranscript {
                 guard !text.isEmpty else { continue }
                 words.append(Self.timestamp(text, segment.start, segment.end, speakerID))
             } else {
-                words.append(contentsOf: segmentWords.map {
-                    Self.timestamp($0.word, $0.start, $0.end, speakerID)
-                })
+                words.append(
+                    contentsOf: segmentWords.map {
+                        Self.timestamp($0.word, $0.start, $0.end, speakerID)
+                    })
             }
         }
 
@@ -153,11 +155,16 @@ extension ExternalTranscript {
             rawTranscript: MeetingTranscriptFinalizer.transcriptText(from: words),
             words: words,
             speakers: infos,
-            diarizationSegments: MeetingTranscriptFinalizer.buildDiarizationSegments(from: words)
+            // Unattributed words are skipped: the finalizer's builder stops at
+            // a first word without a speaker, and tools often open with one.
+            diarizationSegments: MeetingTranscriptFinalizer.buildDiarizationSegments(
+                from: words.filter { $0.speakerId != nil }
+            )
         )
     }
 
-    private static func timestamp(_ text: String, _ start: Double, _ end: Double, _ speakerID: String?) -> WordTimestamp {
+    private static func timestamp(_ text: String, _ start: Double, _ end: Double, _ speakerID: String?) -> WordTimestamp
+    {
         let startMs = max(0, Int((start * 1000).rounded()))
         return WordTimestamp(
             word: text.trimmingCharacters(in: .whitespacesAndNewlines),

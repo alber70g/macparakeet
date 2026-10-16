@@ -28,10 +28,12 @@ final class ExternalTranscriptTests: XCTestCase {
     func testRosterShowsSuggestedNamesAndNumbersUnnamedSpeakers() throws {
         let imported = try ExternalTranscript.decode(Data(Self.sampleJSON.utf8)).imported()
 
-        XCTAssertEqual(imported.speakers, [
-            SpeakerInfo(id: "external:L_SPEAKER_00", label: "Albert"),
-            SpeakerInfo(id: "external:R_SPEAKER_00", label: "Speaker 2"),
-        ])
+        XCTAssertEqual(
+            imported.speakers,
+            [
+                SpeakerInfo(id: "external:L_SPEAKER_00", label: "Albert"),
+                SpeakerInfo(id: "external:R_SPEAKER_00", label: "Speaker 2"),
+            ])
         // "Speaker N" reads as unnamed everywhere the app offers naming.
         XCTAssertTrue(imported.speakers[1].carriesAutomaticLabel)
     }
@@ -45,23 +47,27 @@ final class ExternalTranscriptTests: XCTestCase {
 
     func testSegmentWithoutWordsBecomesOneTokenAtSegmentTiming() throws {
         let json = """
-        {"version": 1, "speakers": [{"id": "A"}],
-         "segments": [{"speaker": "A", "start": 2.0, "end": 3.5, "text": "Hello there", "words": []}]}
-        """
+            {"version": 1, "speakers": [{"id": "A"}],
+             "segments": [{"speaker": "A", "start": 2.0, "end": 3.5, "text": "Hello there", "words": []}]}
+            """
         let imported = try ExternalTranscript.decode(Data(json.utf8)).imported()
 
         // No invented per-word timings: the whole line keeps its own envelope.
-        XCTAssertEqual(imported.words, [
-            WordTimestamp(word: "Hello there", startMs: 2000, endMs: 3500, confidence: 1.0, speakerId: "external:A"),
-        ])
+        XCTAssertEqual(
+            imported.words,
+            [
+                WordTimestamp(word: "Hello there", startMs: 2000, endMs: 3500, confidence: 1.0, speakerId: "external:A")
+            ])
     }
 
     func testDiarizationSegmentsFollowSpeakerTurns() throws {
         let imported = try ExternalTranscript.decode(Data(Self.sampleJSON.utf8)).imported()
 
-        XCTAssertEqual(imported.diarizationSegments.map(\.speakerId), [
-            "external:L_SPEAKER_00", "external:R_SPEAKER_00",
-        ])
+        XCTAssertEqual(
+            imported.diarizationSegments.map(\.speakerId),
+            [
+                "external:L_SPEAKER_00", "external:R_SPEAKER_00",
+            ])
     }
 
     func testUnsupportedVersionIsRejected() {
@@ -84,29 +90,29 @@ final class ExternalTranscriptTests: XCTestCase {
     }
 
     static let sampleJSON = """
-    {
-      "version": 1,
-      "job_id": "job",
-      "language": null,
-      "speakers": [
-        {"id": "L_SPEAKER_00", "label": "Albert", "label_source": "suggestion",
-         "suggested_label": "Albert", "suggestion_score": 0.77,
-         "sample_file": "L_SPEAKER_00__Albert_0.77.wav", "excluded": false},
-        {"id": "R_SPEAKER_00", "label": null, "label_source": null,
-         "suggested_label": null, "suggestion_score": null,
-         "sample_file": "R_SPEAKER_00__NAME-ME.wav", "excluded": false},
-        {"id": "R_SPEAKER_01", "label": "Gone", "label_source": "named",
-         "sample_file": null, "excluded": true}
-      ],
-      "segments": [
-        {"speaker": null, "start": 1.2, "end": 1.6, "text": "Yeah.",
-         "words": [{"word": "Yeah.", "start": 1.2, "end": 1.6}]},
-        {"speaker": "L_SPEAKER_00", "start": 1.752, "end": 4.232, "text": "Ja, man.",
-         "words": [{"word": "Ja,", "start": 1.752, "end": 2.152}, {"word": "man.", "start": 3.592, "end": 4.232}]},
-        {"speaker": "R_SPEAKER_00", "start": 8.4, "end": 9.3, "text": "Hoe is hij?",
-         "words": [{"word": "Hoe", "start": 8.4, "end": 8.8}, {"word": "is", "start": 8.8, "end": 9.0},
-                   {"word": "hij?", "start": 9.0, "end": 9.3}]}
-      ]
-    }
-    """
+        {
+          "version": 1,
+          "job_id": "job",
+          "language": null,
+          "speakers": [
+            {"id": "L_SPEAKER_00", "label": "Albert", "label_source": "suggestion",
+             "suggested_label": "Albert", "suggestion_score": 0.77,
+             "sample_file": "L_SPEAKER_00__Albert_0.77.wav", "excluded": false},
+            {"id": "R_SPEAKER_00", "label": null, "label_source": null,
+             "suggested_label": null, "suggestion_score": null,
+             "sample_file": "R_SPEAKER_00__NAME-ME.wav", "excluded": false},
+            {"id": "R_SPEAKER_01", "label": "Gone", "label_source": "named",
+             "sample_file": null, "excluded": true}
+          ],
+          "segments": [
+            {"speaker": null, "start": 1.2, "end": 1.6, "text": "Yeah.",
+             "words": [{"word": "Yeah.", "start": 1.2, "end": 1.6}]},
+            {"speaker": "L_SPEAKER_00", "start": 1.752, "end": 4.232, "text": "Ja, man.",
+             "words": [{"word": "Ja,", "start": 1.752, "end": 2.152}, {"word": "man.", "start": 3.592, "end": 4.232}]},
+            {"speaker": "R_SPEAKER_00", "start": 8.4, "end": 9.3, "text": "Hoe is hij?",
+             "words": [{"word": "Hoe", "start": 8.4, "end": 8.8}, {"word": "is", "start": 8.8, "end": 9.0},
+                       {"word": "hij?", "start": 9.0, "end": 9.3}]}
+          ]
+        }
+        """
 }

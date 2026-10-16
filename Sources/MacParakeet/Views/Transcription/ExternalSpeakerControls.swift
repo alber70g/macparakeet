@@ -74,10 +74,13 @@ struct ExternalSpeakerWriteBackStatus: View {
                 .font(DesignSystem.Typography.caption)
                 .foregroundStyle(.secondary)
         } else if let error {
-            Label("Names were saved here but not sent to the external transcriber: \(error)", systemImage: "exclamationmark.triangle")
-                .font(DesignSystem.Typography.caption)
-                .foregroundStyle(DesignSystem.Colors.warningAmber)
-                .textSelection(.enabled)
+            Label(
+                "Names were saved here but not sent to the external transcriber: \(error)",
+                systemImage: "exclamationmark.triangle"
+            )
+            .font(DesignSystem.Typography.caption)
+            .foregroundStyle(DesignSystem.Colors.warningAmber)
+            .textSelection(.enabled)
         }
     }
 }
