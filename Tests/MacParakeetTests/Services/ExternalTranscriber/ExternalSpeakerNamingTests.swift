@@ -93,7 +93,14 @@ final class ExternalSpeakerNamingTests: XCTestCase {
                 ))
             }
 
-        let dropped = naming.plan(attribution: try resolve([.reviseText(changes: omissions)]))
+        // The exact pair the Drop action commits: omit the lines, then remove
+        // the speaker. `resolve` fails if either command does not replay.
+        let dropped = naming.plan(
+            attribution: try resolve([
+                .reviseText(changes: omissions),
+                .remove(speakerID: "external:R_SPEAKER_00", reassignTo: .unassigned),
+            ])
+        )
         XCTAssertEqual(dropped["R_SPEAKER_00"], .dropped)
         XCTAssertTrue(try naming.applyFileMoves(dropped))
         // Moved aside, not deleted: Undo must be able to bring the speaker back.

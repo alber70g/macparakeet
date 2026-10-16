@@ -1528,7 +1528,9 @@ public actor TranscriptionService:
         do {
             if let externalConfiguration, let externalTranscriber {
                 lifecycleStage = .stt
-                onProgress?(.transcribing(percent: 0))
+                // The command reports no progress; an indeterminate phase
+                // avoids a bar that sits at 0% for the whole run.
+                onProgress?(.identifyingSpeakers)
                 let outputFolder = ExternalTranscriberConfiguration.outputFolder(inMeetingFolder: recording.folderURL)
                 let external = try await externalTranscriber.transcribe(
                     audioURL: recording.mixedAudioURL,
