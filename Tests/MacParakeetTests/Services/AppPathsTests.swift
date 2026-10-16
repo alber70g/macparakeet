@@ -122,6 +122,29 @@ final class AppPathsTests: XCTestCase {
         )
     }
 
+    /// A dev build pointed at the stable root must share the stable models
+    /// (no second download), and clearing the model cache must not delete
+    /// the whole shared FluidAudio models folder.
+    func testDeveloperAppStateDirAtStableRootUsesStableModelsAndMeetingFolder() throws {
+        let environment = [AppPaths.debugAppStateDirEnvironmentKey: AppPaths.stableAppSupportDir]
+
+        XCTAssertEqual(AppPaths.resolvedAppSupportDir(environment: environment), AppPaths.stableAppSupportDir)
+        XCTAssertEqual(
+            AppPaths.resolvedFluidAudioModelsDir(environment: environment),
+            AppPaths.resolvedFluidAudioModelsDir(environment: [:])
+        )
+        XCTAssertFalse(AppPaths.hasDebugAppStateDirOverride(environment: environment))
+
+        let suiteName = "AppPathsTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("/tmp/custom-meetings", forKey: AppPaths.meetingArtifactsFolderKey)
+        XCTAssertEqual(
+            AppPaths.configuredMeetingRecordingsDir(defaults: defaults, environment: environment),
+            "/tmp/custom-meetings"
+        )
+    }
+
     func testDeveloperAppStateDirKeepsMeetingRecordingsInsideThrowawayRoot() {
         let suiteName = makeIsolatedDefaultsSuite("macparakeet.test.paths.")
         let defaults = UserDefaults(suiteName: suiteName)!

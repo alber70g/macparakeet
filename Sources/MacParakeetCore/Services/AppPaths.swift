@@ -32,6 +32,11 @@ public enum AppPaths {
         if let override = debugAppStateDir(environment: environment, bundleIdentifier: bundleIdentifier) {
             return override
         }
+        return stableAppSupportDir
+    }
+
+    /// The stable app's state root.
+    static var stableAppSupportDir: String {
         let path =
             FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
@@ -39,6 +44,16 @@ public enum AppPaths {
             .path
             ?? (NSHomeDirectory() + "/Library/Application Support")
         return path + "/MacParakeet"
+    }
+
+    /// The debug override, unless it points at the stable app's root. A dev
+    /// build run against the stable state then also uses the stable model and
+    /// log locations instead of downloading models into a second copy.
+    private static func scopedDebugAppStateDir(environment: [String: String]) -> String? {
+        guard let override = debugAppStateDir(environment: environment),
+            override != stableAppSupportDir
+        else { return nil }
+        return override
     }
 
     /// Database file path
@@ -81,7 +96,7 @@ public enum AppPaths {
         defaults: UserDefaults = .standard,
         environment: [String: String]
     ) -> String {
-        if debugAppStateDir(environment: environment) != nil {
+        if scopedDebugAppStateDir(environment: environment) != nil {
             return defaultMeetingRecordingsDir(environment: environment)
         }
         if let raw = defaults.string(forKey: meetingArtifactsFolderKey),
@@ -130,7 +145,7 @@ public enum AppPaths {
 
     /// Local diagnostic logs directory.
     public static var logsDir: String {
-        if let override = debugAppStateDir(environment: ProcessInfo.processInfo.environment) {
+        if let override = scopedDebugAppStateDir(environment: ProcessInfo.processInfo.environment) {
             return "\(override)/logs"
         }
         let path =
@@ -175,7 +190,7 @@ public enum AppPaths {
     }
 
     static func hasDebugAppStateDirOverride(environment: [String: String]) -> Bool {
-        debugAppStateDir(environment: environment) != nil
+        scopedDebugAppStateDir(environment: environment) != nil
     }
 
     static var fluidAudioBaseDirURL: URL {
@@ -191,7 +206,7 @@ public enum AppPaths {
     }
 
     static func resolvedFluidAudioModelsDir(environment: [String: String]) -> URL {
-        if let override = debugAppStateDir(environment: environment) {
+        if let override = scopedDebugAppStateDir(environment: environment) {
             return URL(fileURLWithPath: override, isDirectory: true)
                 .appendingPathComponent("FluidAudio", isDirectory: true)
                 .appendingPathComponent("Models", isDirectory: true)
