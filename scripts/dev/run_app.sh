@@ -20,6 +20,11 @@ APP_MACOS_BIN="$APP_BUNDLE/Contents/MacOS/MacParakeet"
 # Keep every Dev bundle off the stable app's database and media directories.
 # The override is honored in both Debug and optimized Release configurations.
 APP_STATE_DIR="${MACPARAKEET_DEBUG_APP_STATE_DIR:-$HOME/Library/Application Support/MacParakeet-Dev}"
+# MACPARAKEET_DEV_USE_STABLE_STATE=1 runs the Dev bundle on the stable app's
+# database, meetings and models instead. Quit the stable app first.
+if [[ "${MACPARAKEET_DEV_USE_STABLE_STATE:-}" == "1" ]]; then
+  APP_STATE_DIR="$HOME/Library/Application Support/MacParakeet"
+fi
 
 pick_codesign_identity() {
   local preferred="${MACPARAKEET_CODESIGN_IDENTITY:-}"
