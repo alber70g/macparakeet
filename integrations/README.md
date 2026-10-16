@@ -900,6 +900,19 @@ macparakeet-cli config set meeting-hook-timeout 20
 macparakeet-cli config set meeting-hook-enabled on
 ```
 
+To find speakers with an external tool instead of the built-in diarizer, set a
+disabled-by-default detect command. It runs in the login shell, reads the
+audio from `$MACPARAKEET_AUDIO` and writes `diarization.json` plus speaker
+samples into `$MACPARAKEET_OUT_DIR`. MacParakeet still recognizes the words.
+The value `paraspeakrs` selects the preset (`paraspeakrs agent diarize`).
+Contract: [External Diarizer v1](../spec/contracts/external-diarizer-v1.md).
+
+```bash
+macparakeet-cli config set external-diarizer-command paraspeakrs
+macparakeet-cli config set external-diarizer-apply-command paraspeakrs
+macparakeet-cli config set external-diarizer-enabled on
+```
+
 Meeting commands that support `--envelope` return an opt-in success envelope:
 
 ```json

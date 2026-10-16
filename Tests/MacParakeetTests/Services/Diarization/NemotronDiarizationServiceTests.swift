@@ -292,7 +292,10 @@ final class NemotronDiarizationServiceTests: XCTestCase {
     }
 
     func testAutomaticAndExplicitFactoryPolicies() async {
-        XCTAssertTrue(DiarizationServiceFactory.live.make(speakerConstraint: nil) is NemotronDiarizationService)
+        // Automatic runs go through the Settings switch between the built-in
+        // diarizer and an external command (ADR-035); built-in is Nemotron.
+        let automatic = DiarizationServiceFactory.live.make(speakerConstraint: nil)
+        XCTAssertTrue((automatic as? SelectableDiarizationService)?.builtIn is NemotronDiarizationService)
         for constraint in [SpeakerDiarizationConstraint.exact(12), .range(min: 2, max: 5)] {
             let service = DiarizationServiceFactory.live.make(speakerConstraint: constraint)
             XCTAssertTrue(service is DiarizationService)

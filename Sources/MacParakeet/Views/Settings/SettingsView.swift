@@ -96,6 +96,10 @@ struct SettingsView: View {
     let onHotkeyRecordingStateChanged: (Bool) -> Void
 
     @State private var rootViewModel = SettingsRootViewModel()
+    /// The Speaker Detection card on the Engine tab writes these; the
+    /// Capture tab's speaker toggles name the detector they will use.
+    @AppStorage(ExternalDiarizerConfiguration.enabledKey) private var externalDiarizerEnabled = false
+    @AppStorage(ExternalDiarizerConfiguration.commandKey) private var externalDiarizerCommand = ""
     @FocusState private var searchFieldFocused: Bool
     /// Set when a search-result row is tapped. Each tab's `ScrollView`
     /// watches this via `.task(id:)`; whichever ScrollView is on screen
@@ -435,6 +439,7 @@ struct SettingsView: View {
             engineNemotronModelCard.id("engine.nemotronModel")
             engineCohereModelCard.id("engine.cohereModel")
             engineLanguageCard.id("engine.language")
+            SpeakerDetectionSettingsCard().id("engine.speakerDetection")
             enginesModelsCard.id("engine.models")
         }
         .alert(
@@ -1430,10 +1435,11 @@ struct SettingsView: View {
 
                 settingsToggleRow(
                     title: "Speaker detection",
-                    detail: AppFeatures.isVoiceProfilesAvailable()
-                        ? "Split captured system audio into other speakers after recording when audio is clear."
-                        : "Automatically label up to eight other speakers in system audio after recording. "
-                            + "Your microphone stays labeled Me.",
+                    detail: externalSpeakerDetectorDetail
+                        ?? (AppFeatures.isVoiceProfilesAvailable()
+                            ? "Split captured system audio into other speakers after recording when audio is clear."
+                            : "Automatically label up to eight other speakers in system audio after recording. "
+                                + "Your microphone stays labeled Me."),
                     isOn: $viewModel.meetingSpeakerDiarization
                 )
 
@@ -1721,9 +1727,10 @@ struct SettingsView: View {
 
                 settingsToggleRow(
                     title: "Speaker detection",
-                    detail: AppFeatures.isVoiceProfilesAvailable()
-                        ? "Add speaker labels to file and URL transcriptions when audio is clear."
-                        : "Automatically label up to eight speakers in file and URL transcriptions.",
+                    detail: externalSpeakerDetectorDetail
+                        ?? (AppFeatures.isVoiceProfilesAvailable()
+                            ? "Add speaker labels to file and URL transcriptions when audio is clear."
+                            : "Automatically label up to eight speakers in file and URL transcriptions."),
                     isOn: $viewModel.speakerDiarization
                 )
 
@@ -2382,6 +2389,18 @@ struct SettingsView: View {
         let confirmationMessage: String
         let confirmButtonLabel: String
         let perform: () -> Void
+    }
+
+    /// Detail for the Capture tab's speaker toggles while the Engine tab's
+    /// Speaker Detection card selects an external command.
+    private var externalSpeakerDetectorDetail: String? {
+        let configuration = ExternalDiarizerConfiguration(
+            enabled: externalDiarizerEnabled,
+            command: externalDiarizerCommand
+        )
+        guard configuration.isActive else { return nil }
+        return "Uses \(configuration.commandName ?? "your external command") to find speakers after "
+            + "transcription. Choose the detector under Engine › Speaker Detection."
     }
 
     // MARK: - Engine

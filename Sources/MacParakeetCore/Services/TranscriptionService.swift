@@ -1525,6 +1525,7 @@ public actor TranscriptionService:
                 do {
                     systemDiarization = try await diarizeMeetingSystemIfNeeded(
                         recording: recording,
+                        transcriptionID: transcription.id,
                         sourceWavURLs: sourceWavURLs,
                         requested: true,
                         diarizationService: activeDiarizationService,
@@ -1797,6 +1798,7 @@ public actor TranscriptionService:
 
     private func diarizeMeetingSystemIfNeeded(
         recording: MeetingRecordingOutput,
+        transcriptionID: UUID,
         sourceWavURLs: [AudioSource: URL],
         requested: Bool,
         diarizationService: (any DiarizationServiceProtocol)?,
@@ -1823,7 +1825,11 @@ public actor TranscriptionService:
             let diarStartedAt = Date()
             let diarResult = try await diarizationService.diarize(
                 audioURL: systemWavURL,
-                speakerConstraint: speakerPolicy.speakerConstraintHint
+                speakerConstraint: speakerPolicy.speakerConstraintHint,
+                context: DiarizationRunContext(
+                    transcriptionID: transcriptionID,
+                    outputFolder: ExternalSpeakerDetectionLocation.outputFolder(inMeetingFolder: recording.folderURL)
+                )
             )
             try Task.checkCancellation()
             let diarDuration = Date().timeIntervalSince(diarStartedAt)
@@ -1842,10 +1848,13 @@ public actor TranscriptionService:
 
             guard !diarResult.segments.isEmpty else { return nil }
 
+            // A name the detector already knows (an external voice library)
+            // is kept; everyone else is numbered on the system side.
             let mappedSpeakers = diarResult.speakers.enumerated().map { index, speaker in
                 SpeakerInfo(
                     id: "\(AudioSource.system.rawValue):\(speaker.id)",
-                    label: "\(AudioSource.system.displayLabel) \(index + 1)"
+                    label: diarResult.suppliedLabels[speaker.id]
+                        ?? "\(AudioSource.system.displayLabel) \(index + 1)"
                 )
             }
             let speakerIDMap = Dictionary(uniqueKeysWithValues: zip(
@@ -2047,7 +2056,14 @@ public actor TranscriptionService:
                     onProgress?(.identifyingSpeakers)
                     Telemetry.send(.diarizationStarted(source: source))
                     let diarStartedAt = Date()
-                    let diarResult = try await diarizationService.diarize(audioURL: wavURL)
+                    let diarResult = try await diarizationService.diarize(
+                        audioURL: wavURL,
+                        speakerConstraint: nil,
+                        context: DiarizationRunContext(
+                            transcriptionID: transcription.id,
+                            outputFolder: ExternalSpeakerDetectionLocation.outputFolder(for: transcription)
+                        )
+                    )
                     try Task.checkCancellation()
                     let diarDuration = Date().timeIntervalSince(diarStartedAt)
                     if !diarResult.segments.isEmpty {

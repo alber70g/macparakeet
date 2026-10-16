@@ -46,6 +46,7 @@ Planned contracts are listed separately below; they do not describe available pa
 - [Saved-Audio Auto-Prompt Completion](saved-audio-auto-prompt-completion.md)
 
 - [Meeting Artifacts v1](meeting-artifacts-v1.md)
+- [External Diarizer v1](external-diarizer-v1.md) — speaker detection by a user command such as paraspeakrs, sample files and name write-back
 - [Meeting Recovery and Retention Safety](meeting-recovery-retention.md)
 - [CLI JSON v1](cli-json-v1.md)
 - [DAPT Export v1](dapt-export-v1.md)

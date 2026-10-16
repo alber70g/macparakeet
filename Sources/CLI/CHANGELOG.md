@@ -94,6 +94,16 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
 
 ## [Unreleased]
 
+### Added
+
+- `config` keys `external-diarizer-enabled`, `external-diarizer-command`,
+  `external-diarizer-apply-command` and `external-diarizer-timeout`. With them
+  set, `transcribe`, `retranscribe` and `meetings import` find speakers with
+  the external command (for example `paraspeakrs`) instead of the built-in
+  diarizer, unless `--speaker-count`, `--speaker-min` or `--speaker-max` is
+  given. The value `paraspeakrs` selects the preset command. Contract:
+  `spec/contracts/external-diarizer-v1.md`.
+
 ### Fixed
 
 - A provider request that hits its idle timeout reports `errorType` `timeout`

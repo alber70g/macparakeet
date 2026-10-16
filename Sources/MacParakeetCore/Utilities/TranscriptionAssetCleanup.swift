@@ -129,6 +129,16 @@ public enum TranscriptionAssetCleanup {
         for transcription: Transcription,
         fileManager: FileManager
     ) throws {
+        if transcription.sourceType != .meeting {
+            // Speaker samples from an external detector (ADR-035). A meeting
+            // keeps them in its folder, which the meeting case removes.
+            let speakerDetectionFolder = ExternalSpeakerDetectionLocation.outputFolder(
+                forTranscriptionID: transcription.id
+            )
+            if fileManager.fileExists(atPath: speakerDetectionFolder.path) {
+                try fileManager.removeItem(at: speakerDetectionFolder)
+            }
+        }
         switch transcription.sourceType {
         case .youtube, .podcast:
             // Both downloaded-media sources store their audio under the shared

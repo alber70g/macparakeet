@@ -74,6 +74,11 @@ struct ConfigCommand: ParsableCommand {
           meeting-hook-enabled      on|off                          default: off
           meeting-hook-path         absolute executable path|none    default: none
           meeting-hook-timeout      seconds (1-300)                 default: 20
+          external-diarizer-enabled on|off                          default: off
+          external-diarizer-command shell command|paraspeakrs|none  default: none
+          external-diarizer-apply-command
+                                    shell command|paraspeakrs|none  default: none
+          external-diarizer-timeout seconds (60-14400)              default: 1800
 
         Full event catalog:
           https://github.com/moona3k/macparakeet/blob/main/docs/telemetry.md
@@ -269,6 +274,30 @@ struct ConfigCommand: ParsableCommand {
             allowedValues: nil,
             summary: "Meeting automation hook timeout in seconds."
         ),
+        CLIConfigKeySpec(
+            key: "external-diarizer-enabled",
+            valueSyntax: "on|off",
+            allowedValues: ["on", "off"],
+            summary: "Find speakers with the external command instead of the built-in detector."
+        ),
+        CLIConfigKeySpec(
+            key: "external-diarizer-command",
+            valueSyntax: "shell command|paraspeakrs|none",
+            allowedValues: ["paraspeakrs", "none"],
+            summary: "Command that writes diarization.json and speaker samples; reads $MACPARAKEET_AUDIO and $MACPARAKEET_OUT_DIR."
+        ),
+        CLIConfigKeySpec(
+            key: "external-diarizer-apply-command",
+            valueSyntax: "shell command|paraspeakrs|none",
+            allowedValues: ["paraspeakrs", "none"],
+            summary: "Command run after speakers are named, so the tool learns the voices."
+        ),
+        CLIConfigKeySpec(
+            key: "external-diarizer-timeout",
+            valueSyntax: "seconds 60-14400",
+            allowedValues: nil,
+            summary: "External speaker detection time limit in seconds."
+        ),
     ]
     static let supportedKeys: [String] = supportedKeySpecs.map(\.key)
 
@@ -448,6 +477,14 @@ struct ConfigCommand: ParsableCommand {
             let timeout = store.object(forKey: MeetingAutomationHookConfiguration.timeoutSecondsKey) as? Double
                 ?? MeetingAutomationHookConfiguration.defaultTimeoutSeconds
             return displayTimeout(MeetingAutomationHookConfiguration.clampedTimeout(timeout))
+        case "external-diarizer-enabled":
+            return ExternalDiarizerConfiguration.current(defaults: store).enabled ? "on" : "off"
+        case "external-diarizer-command":
+            return displayCommand(ExternalDiarizerConfiguration.current(defaults: store).command)
+        case "external-diarizer-apply-command":
+            return displayCommand(ExternalDiarizerConfiguration.current(defaults: store).applyCommand)
+        case "external-diarizer-timeout":
+            return displayTimeout(ExternalDiarizerConfiguration.current(defaults: store).timeoutSeconds)
         default:
             throw unknownKeyError(key)
         }
@@ -615,6 +652,22 @@ struct ConfigCommand: ParsableCommand {
         case "meeting-hook-timeout":
             let timeout = try parseMeetingHookTimeout(value)
             store.set(timeout, forKey: MeetingAutomationHookConfiguration.timeoutSecondsKey)
+            return displayTimeout(timeout)
+        case "external-diarizer-enabled":
+            let parsed = try parseBool(value, key: key)
+            store.set(parsed, forKey: ExternalDiarizerConfiguration.enabledKey)
+            return parsed ? "on" : "off"
+        case "external-diarizer-command":
+            let command = parseExternalCommand(value) { $0.command }
+            store.set(command, forKey: ExternalDiarizerConfiguration.commandKey)
+            return displayCommand(command)
+        case "external-diarizer-apply-command":
+            let command = parseExternalCommand(value) { $0.applyCommand }
+            store.set(command, forKey: ExternalDiarizerConfiguration.applyCommandKey)
+            return displayCommand(command)
+        case "external-diarizer-timeout":
+            let timeout = try parseExternalDiarizerTimeout(value)
+            store.set(timeout, forKey: ExternalDiarizerConfiguration.timeoutSecondsKey)
             return displayTimeout(timeout)
         default:
             throw unknownKeyError(key)
@@ -822,6 +875,33 @@ struct ConfigCommand: ParsableCommand {
               seconds <= MeetingAutomationHookConfiguration.maximumTimeoutSeconds
         else {
             throw ValidationError("Invalid value for meeting-hook-timeout: '\(value)'. Use seconds from 1 to 300.")
+        }
+        return seconds
+    }
+
+    /// A preset name selects that preset's command; `none` clears it.
+    static func parseExternalCommand(
+        _ value: String,
+        presetCommand: (ExternalDiarizerPreset) -> String
+    ) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let preset = ExternalDiarizerPreset(rawValue: trimmed.lowercased()) {
+            return presetCommand(preset)
+        }
+        return ["none", "off", "reset"].contains(trimmed.lowercased()) ? "" : trimmed
+    }
+
+    static func displayCommand(_ command: String) -> String {
+        command.isEmpty ? "none" : command
+    }
+
+    static func parseExternalDiarizerTimeout(_ value: String) throws -> TimeInterval {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let seconds = Double(trimmed),
+              seconds >= ExternalDiarizerConfiguration.minimumTimeoutSeconds,
+              seconds <= ExternalDiarizerConfiguration.maximumTimeoutSeconds
+        else {
+            throw ValidationError("Invalid value for external-diarizer-timeout: '\(value)'. Use seconds from 60 to 14400.")
         }
         return seconds
     }

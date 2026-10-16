@@ -272,6 +272,12 @@ public enum AppPaths {
         "\(appSupportDir)/discover-cache.json"
     }
 
+    /// External speaker-detection output for file and URL transcriptions,
+    /// one folder per transcription. Meetings keep theirs in the meeting folder.
+    public static var speakerDetectionDir: String {
+        "\(appSupportDir)/speaker-detection"
+    }
+
     /// Thumbnail cache directory
     public static var thumbnailsDir: String {
         "\(appSupportDir)/thumbnails"

@@ -11,19 +11,24 @@ public struct MacParakeetDiarizationResult: Sendable {
     public let speakerEmbeddings: [String: SpeakerEmbedding]
     /// Activity durations per speaker. Different speakers may overlap.
     public let speechMsBySpeaker: [String: Int]
+    /// Names the detector already knows for a speaker (an external detector's
+    /// voice library). Callers that relabel speakers keep these.
+    public let suppliedLabels: [String: String]
 
     public init(
         segments: [SpeakerSegment],
         speakerCount: Int,
         speakers: [SpeakerInfo],
         speakerEmbeddings: [String: SpeakerEmbedding] = [:],
-        speechMsBySpeaker: [String: Int] = [:]
+        speechMsBySpeaker: [String: Int] = [:],
+        suppliedLabels: [String: String] = [:]
     ) {
         self.segments = segments
         self.speakerCount = speakerCount
         self.speakers = speakers
         self.speakerEmbeddings = speakerEmbeddings
         self.speechMsBySpeaker = speechMsBySpeaker
+        self.suppliedLabels = suppliedLabels
     }
 
     /// Speech for one speaker, in seconds; 0 when it has none.
@@ -115,8 +120,23 @@ public struct DiarizationServiceFactory: Sendable {
         NemotronDiarizationService.clearModelCache(directory: directory)
     }
 
+    /// An explicit speaker count needs the built-in diarizer; external
+    /// detectors take no count (ADR-035). Otherwise the Settings choice
+    /// between built-in and external is read on every run.
     public static let live = Self { constraint in
-        makeLiveService(speakerConstraint: constraint, voiceProfilesAvailable: AppFeatures.isVoiceProfilesAvailable())
+        let builtIn = makeLiveService(
+            speakerConstraint: constraint,
+            voiceProfilesAvailable: AppFeatures.isVoiceProfilesAvailable()
+        )
+        guard constraint == nil else { return builtIn }
+        let configuration: @Sendable () -> ExternalDiarizerConfiguration = {
+            .current(defaults: ExternalDiarizerConfiguration.liveDefaults())
+        }
+        return SelectableDiarizationService(
+            builtIn: builtIn,
+            external: ExternalDiarizationService(configuration: configuration),
+            configuration: configuration
+        )
     }
 
     static func makeLiveService(
@@ -142,6 +162,14 @@ public protocol DiarizationServiceProtocol: Sendable {
         audioURL: URL,
         speakerConstraint: SpeakerDiarizationConstraint?
     ) async throws -> MacParakeetDiarizationResult
+    /// Diarizes `audioURL` for one saved transcription. A detector that leaves
+    /// files the user works with afterwards (speaker samples) writes them to
+    /// `context.outputFolder`. Built-in detectors ignore the context.
+    func diarize(
+        audioURL: URL,
+        speakerConstraint: SpeakerDiarizationConstraint?,
+        context: DiarizationRunContext?
+    ) async throws -> MacParakeetDiarizationResult
     func prepareModels(onProgress: (@Sendable (String) -> Void)?) async throws
     func isReady() async -> Bool
     func hasCachedModels() async -> Bool
@@ -151,9 +179,29 @@ public protocol DiarizationServiceProtocol: Sendable {
     func explicitSpeakerConstraint() async -> SpeakerDiarizationConstraint?
 }
 
+/// The transcription a diarization run belongs to, and the folder where a
+/// detector may keep its output for that transcription.
+public struct DiarizationRunContext: Sendable, Equatable {
+    public let transcriptionID: UUID
+    public let outputFolder: URL
+
+    public init(transcriptionID: UUID, outputFolder: URL) {
+        self.transcriptionID = transcriptionID
+        self.outputFolder = outputFolder
+    }
+}
+
 extension DiarizationServiceProtocol {
     public func diarize(audioURL: URL) async throws -> MacParakeetDiarizationResult {
         try await diarize(audioURL: audioURL, speakerConstraint: nil)
+    }
+
+    public func diarize(
+        audioURL: URL,
+        speakerConstraint: SpeakerDiarizationConstraint?,
+        context: DiarizationRunContext?
+    ) async throws -> MacParakeetDiarizationResult {
+        try await diarize(audioURL: audioURL, speakerConstraint: speakerConstraint)
     }
 
     public func explicitSpeakerConstraint() async -> SpeakerDiarizationConstraint? {

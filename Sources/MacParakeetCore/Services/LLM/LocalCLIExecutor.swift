@@ -291,6 +291,25 @@ public final class LocalCLIExecutor: Sendable {
         )
     }
 
+    /// Runs a shell command template with extra environment variables and an
+    /// empty stdin, returning stdout (possibly empty). Used by commands that
+    /// write their result to files, such as the external speaker detector.
+    /// Values reach the command only through the environment, never through
+    /// the command string, so paths cannot inject shell syntax.
+    public func runCommand(
+        _ commandTemplate: String,
+        environment: [String: String],
+        timeout: Double
+    ) async throws -> String {
+        try await runProcess(
+            commandTemplate: commandTemplate,
+            fullPrompt: "",
+            timeout: timeout,
+            extraEnvironment: environment,
+            requiresOutput: false
+        )
+    }
+
     /// Connection tests use a trivial prompt, so a hung command should not
     /// pin the settings UI for the full (now minutes-long) generation timeout.
     static let testConnectionTimeoutCap: Double = 45
@@ -485,7 +504,9 @@ public final class LocalCLIExecutor: Sendable {
     private func runProcess(
         commandTemplate: String,
         fullPrompt: String,
-        timeout: Double
+        timeout: Double,
+        extraEnvironment: [String: String] = [:],
+        requiresOutput: Bool = true
     ) async throws -> String {
         let clampedTimeout = max(LocalCLIConfig.minimumTimeout, timeout)
         let state = ProcessExecutionState()
@@ -501,6 +522,7 @@ public final class LocalCLIExecutor: Sendable {
 
                     var environment = ProcessInfo.processInfo.environment
                     environment["PATH"] = preferredPATH(fallback: environment["PATH"])
+                    environment.merge(extraEnvironment) { _, extra in extra }
 
                     let inputPipe = Pipe()
                     let outputPipe = Pipe()
@@ -674,7 +696,7 @@ public final class LocalCLIExecutor: Sendable {
                     }
 
                     let sanitizedStdout = Self.sanitizeStandardOutput(stdout)
-                    guard !sanitizedStdout.isEmpty else {
+                    guard !sanitizedStdout.isEmpty || !requiresOutput else {
                         Self.resume(continuation, state: state, result: .failure(LocalCLIError.emptyOutput))
                         return
                     }

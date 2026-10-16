@@ -56,6 +56,10 @@ final class ConfigCommandTests: XCTestCase {
             "meeting-hook-enabled",
             "meeting-hook-path",
             "meeting-hook-timeout",
+            "external-diarizer-enabled",
+            "external-diarizer-command",
+            "external-diarizer-apply-command",
+            "external-diarizer-timeout",
         ])
     }
 
@@ -113,6 +117,9 @@ final class ConfigCommandTests: XCTestCase {
         XCTAssertEqual(try ConfigCommand.read(key: "meeting-hook-enabled", defaults: defaults), "off")
         XCTAssertEqual(try ConfigCommand.read(key: "meeting-hook-path", defaults: defaults), "none")
         XCTAssertEqual(try ConfigCommand.read(key: "meeting-hook-timeout", defaults: defaults), "20")
+        XCTAssertEqual(try ConfigCommand.read(key: "external-diarizer-enabled", defaults: defaults), "off")
+        XCTAssertEqual(try ConfigCommand.read(key: "external-diarizer-command", defaults: defaults), "none")
+        XCTAssertEqual(try ConfigCommand.read(key: "external-diarizer-timeout", defaults: defaults), "1800")
     }
 
     func testReadCanonicalizesUnderscoreKeys() throws {
@@ -492,6 +499,32 @@ final class ConfigCommandTests: XCTestCase {
 
         XCTAssertEqual(try ConfigCommand.write(key: "meeting-hook-path", value: "none", defaults: defaults), "none")
         XCTAssertNil(defaults.string(forKey: MeetingAutomationHookConfiguration.executablePathKey))
+    }
+
+    /// The app reads these same keys, so a CLI-configured detector must be
+    /// the one the next transcription runs.
+    func testExternalDiarizerConfigIsWhatTheAppReads() throws {
+        XCTAssertEqual(try ConfigCommand.write(key: "external-diarizer-enabled", value: "on", defaults: defaults), "on")
+        XCTAssertEqual(
+            try ConfigCommand.write(key: "external-diarizer-command", value: "paraspeakrs", defaults: defaults),
+            ExternalDiarizerPreset.paraspeakrs.command
+        )
+        XCTAssertEqual(
+            try ConfigCommand.write(key: "external-diarizer-apply-command", value: "paraspeakrs", defaults: defaults),
+            ExternalDiarizerPreset.paraspeakrs.applyCommand
+        )
+        XCTAssertEqual(try ConfigCommand.write(key: "external-diarizer-timeout", value: "600", defaults: defaults), "600")
+
+        let configuration = ExternalDiarizerConfiguration.current(defaults: defaults)
+        XCTAssertTrue(configuration.isActive)
+        XCTAssertTrue(configuration.writesBackNames)
+        XCTAssertEqual(configuration.timeoutSeconds, 600)
+
+        XCTAssertEqual(try ConfigCommand.write(key: "external-diarizer-command", value: "none", defaults: defaults), "none")
+        XCTAssertFalse(ExternalDiarizerConfiguration.current(defaults: defaults).isActive)
+        XCTAssertThrowsError(
+            try ConfigCommand.write(key: "external-diarizer-timeout", value: "5", defaults: defaults)
+        ) { XCTAssertTrue($0 is ValidationError) }
     }
 
     func testMeetingHookConfigRejectsUnsafeValues() {

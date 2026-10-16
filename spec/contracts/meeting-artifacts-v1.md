@@ -141,6 +141,12 @@ The v1 folder can contain these stable filenames:
   written duration to a repaired file's sample rate (clamped to surviving
   media), refreshes the playable timeline from the repaired media, and drops
   tracks whose media cannot be recovered.
+- `speaker-detection/`: optional output of an external speaker detector
+  (ADR-035, [External Diarizer v1](external-diarizer-v1.md)):
+  `diarization.json`, per-speaker sample WAVs named `<id>__<name>.wav`,
+  `dropped/`, the tool's own files, and `macparakeet-error.txt` after a failed
+  run. Recreated by each external run, removed by a built-in run, and deleted
+  with the meeting.
 - `manifest.json`: folder manifest.
 - `meeting.md`: deterministic Markdown view for users and local agents. It
   keeps YAML frontmatter with local metadata and stable sections for title,

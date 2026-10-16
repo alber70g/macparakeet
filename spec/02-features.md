@@ -1630,6 +1630,38 @@ The governing behavior is [ADR-031](adr/031-timed-transcript-corrections.md).
 
 ---
 
+### F13b: External Speaker Detection
+
+**What:** Let a speaker-detection tool the user already runs, such as
+paraspeakrs, find the speakers instead of the built-in diarizer. MacParakeet
+keeps recognizing the words.
+
+**Status:** implemented on the `feat/paraspeakrs-diarization` branch; default
+off.
+
+- Settings → Engine → **Speaker Detection** chooses **Built-in** or
+  **External command**, with a paraspeakrs preset, an optional apply command
+  and a time limit. The Capture tab's "Speaker detection" toggles still turn
+  detection on or off for meetings and for file and URL transcriptions, and
+  name the external command when it is selected.
+- Meetings send the system side; the microphone stays "Me". File and URL
+  transcriptions send the whole audio.
+- A speaker the tool recognizes keeps its name. The speaker overview offers
+  **Play sample**, **Confirm** for an unconfirmed voice-library suggestion
+  ("Suggested · 82%"), and **Drop speaker and their lines**. Rename, merge,
+  drop, Undo and Redo write the names back to the tool.
+- If the command fails, the transcript is kept without speakers and the
+  transcript view says why; Retranscribe runs detection again. An exact
+  speaker count in Retranscribe uses the built-in diarizer.
+- `macparakeet-cli config set external-diarizer-command paraspeakrs` (and
+  `-enabled`, `-apply-command`, `-timeout`) configures the same settings.
+
+The governing behavior is [ADR-035](adr/035-external-speaker-detection.md);
+the command contract is
+[External Diarizer v1](contracts/external-diarizer-v1.md).
+
+---
+
 ### F13a: Voice Profiles (experimental, disabled)
 
 **What:** Remember a named speaker's voice so later meetings suggest the name,

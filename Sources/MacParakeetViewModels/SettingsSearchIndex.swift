@@ -498,6 +498,17 @@ public enum SettingsSearchIndex {
             cardAnchor: "engine.selector"
         ),
         SettingsSearchEntry(
+            id: "engine.speakerDetection",
+            tab: .engine,
+            title: "Speaker Detection",
+            subtitle: "Built-in or an external command such as paraspeakrs.",
+            keywords: [
+                "speaker", "diarization", "who said what", "paraspeakrs", "external", "command",
+                "voice library", "speaker names", "samples",
+            ],
+            cardAnchor: "engine.speakerDetection"
+        ),
+        SettingsSearchEntry(
             id: "engine.models",
             tab: .engine,
             title: "Local Models",

@@ -2916,6 +2916,7 @@ struct TranscriptResultView: View {
             let timestamps = activeTranscription.wordTimestamps,
             !timestamps.isEmpty
         {
+            externalSpeakerDetectionFailure
             if let attribution = viewModel.speakerAttribution {
                 speakerSummaryPanel(speakers: attribution.speakers)
             } else if let speakers = activeTranscription.speakers, !speakers.isEmpty {
@@ -2923,10 +2924,31 @@ struct TranscriptResultView: View {
             }
             timestampedView(words: timestamps)
         } else if !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            externalSpeakerDetectionFailure
             transcriptTextBlock
         } else if meetingTranscriptProcessingPresentation == nil {
             Text("No transcript available")
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
+        }
+    }
+
+    /// External speaker detection failed for this transcript (ADR-035); the
+    /// words are kept, and Retranscribe runs detection again.
+    @ViewBuilder
+    private var externalSpeakerDetectionFailure: some View {
+        if let message = viewModel.externalSpeakerDetectionError {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                Label(
+                    "Speakers were not detected. Retranscribe to try again.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(DesignSystem.Colors.warningAmber)
+                Text(message)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+            .font(DesignSystem.Typography.caption)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -5375,6 +5397,15 @@ struct TranscriptResultView: View {
                                         tint: DesignSystem.Colors.textSecondary)
                                 }
                             }
+
+                            if let external = viewModel.externalSpeaker(for: speaker.id) {
+                                ExternalSpeakerControls(
+                                    speaker: external,
+                                    isBusy: viewModel.isWritingBackExternalSpeakers || mutationsDisabled
+                                ) {
+                                    viewModel.confirmExternalSpeakerSuggestion(speakerID: speaker.id)
+                                }
+                            }
                         }
 
                         Spacer()
@@ -5450,6 +5481,15 @@ struct TranscriptResultView: View {
                                 }
                                 .disabled(AudioSource(rawValue: speaker.id) != nil)
                             }
+
+                            // Matches the external tool's drop: the speaker's
+                            // lines leave the transcript too. Undo restores both.
+                            if viewModel.externalSpeaker(for: speaker.id) != nil {
+                                Divider()
+                                Button("Drop speaker and their lines", role: .destructive) {
+                                    Task { await viewModel.dropExternalSpeaker(speakerID: speaker.id) }
+                                }
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                         }
@@ -5467,6 +5507,13 @@ struct TranscriptResultView: View {
                 Text("Speaker labels are approximate.")
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
+
+                if viewModel.externalSpeakerNaming != nil {
+                    ExternalSpeakerWriteBackStatus(
+                        isWriting: viewModel.isWritingBackExternalSpeakers,
+                        error: viewModel.externalSpeakerWriteBackError
+                    )
+                }
             }
         }
         .padding(DesignSystem.Spacing.md)
