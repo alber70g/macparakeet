@@ -166,7 +166,7 @@ struct MeetingTranscriptFinalizer {
         return speakers
     }
 
-    private static func buildDiarizationSegments(from words: [WordTimestamp]) -> [DiarizationSegmentRecord] {
+    static func buildDiarizationSegments(from words: [WordTimestamp]) -> [DiarizationSegmentRecord] {
         guard let firstWord = words.first, let firstSpeaker = firstWord.speakerId else {
             return []
         }
@@ -235,7 +235,7 @@ struct MeetingTranscriptFinalizer {
         return transcriptText(from: mergedWords)
     }
 
-    private static func transcriptText(from words: [WordTimestamp]) -> String {
+    static func transcriptText(from words: [WordTimestamp]) -> String {
         var parts: [String] = []
         parts.reserveCapacity(words.count)
 

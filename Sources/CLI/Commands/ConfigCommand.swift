@@ -74,6 +74,10 @@ struct ConfigCommand: ParsableCommand {
           meeting-hook-enabled      on|off                          default: off
           meeting-hook-path         absolute executable path|none    default: none
           meeting-hook-timeout      seconds (1-300)                 default: 20
+          external-transcriber-enabled on|off                       default: off
+          external-transcriber-command shell command|paraspeakrs|none default: none
+          external-transcriber-apply-command shell command|paraspeakrs|none default: none
+          external-transcriber-timeout seconds (60-14400)           default: 1800
 
         Full event catalog:
           https://github.com/moona3k/macparakeet/blob/main/docs/telemetry.md
@@ -269,6 +273,30 @@ struct ConfigCommand: ParsableCommand {
             allowedValues: nil,
             summary: "Meeting automation hook timeout in seconds."
         ),
+        CLIConfigKeySpec(
+            key: "external-transcriber-enabled",
+            valueSyntax: "on|off",
+            allowedValues: ["on", "off"],
+            summary: "Transcribe meetings with the external command instead of the built-in engine."
+        ),
+        CLIConfigKeySpec(
+            key: "external-transcriber-command",
+            valueSyntax: "shell command|paraspeakrs|none",
+            allowedValues: ["paraspeakrs", "none"],
+            summary: "Command that writes transcript.json for a meeting; reads $MACPARAKEET_AUDIO and $MACPARAKEET_OUT_DIR."
+        ),
+        CLIConfigKeySpec(
+            key: "external-transcriber-apply-command",
+            valueSyntax: "shell command|paraspeakrs|none",
+            allowedValues: ["paraspeakrs", "none"],
+            summary: "Command run after speakers are named, so the tool learns the names."
+        ),
+        CLIConfigKeySpec(
+            key: "external-transcriber-timeout",
+            valueSyntax: "seconds 60-14400",
+            allowedValues: nil,
+            summary: "External transcriber time limit in seconds."
+        ),
     ]
     static let supportedKeys: [String] = supportedKeySpecs.map(\.key)
 
@@ -448,6 +476,14 @@ struct ConfigCommand: ParsableCommand {
             let timeout = store.object(forKey: MeetingAutomationHookConfiguration.timeoutSecondsKey) as? Double
                 ?? MeetingAutomationHookConfiguration.defaultTimeoutSeconds
             return displayTimeout(MeetingAutomationHookConfiguration.clampedTimeout(timeout))
+        case "external-transcriber-enabled":
+            return ExternalTranscriberConfiguration.current(defaults: store).enabled ? "on" : "off"
+        case "external-transcriber-command":
+            return displayCommand(ExternalTranscriberConfiguration.current(defaults: store).command)
+        case "external-transcriber-apply-command":
+            return displayCommand(ExternalTranscriberConfiguration.current(defaults: store).applyCommand)
+        case "external-transcriber-timeout":
+            return displayTimeout(ExternalTranscriberConfiguration.current(defaults: store).timeoutSeconds)
         default:
             throw unknownKeyError(key)
         }
@@ -615,6 +651,22 @@ struct ConfigCommand: ParsableCommand {
         case "meeting-hook-timeout":
             let timeout = try parseMeetingHookTimeout(value)
             store.set(timeout, forKey: MeetingAutomationHookConfiguration.timeoutSecondsKey)
+            return displayTimeout(timeout)
+        case "external-transcriber-enabled":
+            let parsed = try parseBool(value, key: key)
+            store.set(parsed, forKey: ExternalTranscriberConfiguration.enabledKey)
+            return parsed ? "on" : "off"
+        case "external-transcriber-command":
+            let command = parseExternalCommand(value) { $0.command }
+            store.set(command, forKey: ExternalTranscriberConfiguration.commandKey)
+            return displayCommand(command)
+        case "external-transcriber-apply-command":
+            let command = parseExternalCommand(value) { $0.applyCommand }
+            store.set(command, forKey: ExternalTranscriberConfiguration.applyCommandKey)
+            return displayCommand(command)
+        case "external-transcriber-timeout":
+            let timeout = try parseExternalTranscriberTimeout(value)
+            store.set(timeout, forKey: ExternalTranscriberConfiguration.timeoutSecondsKey)
             return displayTimeout(timeout)
         default:
             throw unknownKeyError(key)
@@ -822,6 +874,33 @@ struct ConfigCommand: ParsableCommand {
               seconds <= MeetingAutomationHookConfiguration.maximumTimeoutSeconds
         else {
             throw ValidationError("Invalid value for meeting-hook-timeout: '\(value)'. Use seconds from 1 to 300.")
+        }
+        return seconds
+    }
+
+    /// A preset name selects that preset's command; `none` clears it.
+    static func parseExternalCommand(
+        _ value: String,
+        presetCommand: (ExternalTranscriberPreset) -> String
+    ) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let preset = ExternalTranscriberPreset(rawValue: trimmed.lowercased()) {
+            return presetCommand(preset)
+        }
+        return ["none", "off", "reset"].contains(trimmed.lowercased()) ? "" : trimmed
+    }
+
+    static func displayCommand(_ command: String) -> String {
+        command.isEmpty ? "none" : command
+    }
+
+    static func parseExternalTranscriberTimeout(_ value: String) throws -> TimeInterval {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let seconds = Double(trimmed),
+              seconds >= ExternalTranscriberConfiguration.minimumTimeoutSeconds,
+              seconds <= ExternalTranscriberConfiguration.maximumTimeoutSeconds
+        else {
+            throw ValidationError("Invalid value for external-transcriber-timeout: '\(value)'. Use seconds from 60 to 14400.")
         }
         return seconds
     }

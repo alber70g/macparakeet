@@ -56,6 +56,10 @@ final class ConfigCommandTests: XCTestCase {
             "meeting-hook-enabled",
             "meeting-hook-path",
             "meeting-hook-timeout",
+            "external-transcriber-enabled",
+            "external-transcriber-command",
+            "external-transcriber-apply-command",
+            "external-transcriber-timeout",
         ])
     }
 
@@ -113,6 +117,9 @@ final class ConfigCommandTests: XCTestCase {
         XCTAssertEqual(try ConfigCommand.read(key: "meeting-hook-enabled", defaults: defaults), "off")
         XCTAssertEqual(try ConfigCommand.read(key: "meeting-hook-path", defaults: defaults), "none")
         XCTAssertEqual(try ConfigCommand.read(key: "meeting-hook-timeout", defaults: defaults), "20")
+        XCTAssertEqual(try ConfigCommand.read(key: "external-transcriber-enabled", defaults: defaults), "off")
+        XCTAssertEqual(try ConfigCommand.read(key: "external-transcriber-command", defaults: defaults), "none")
+        XCTAssertEqual(try ConfigCommand.read(key: "external-transcriber-timeout", defaults: defaults), "1800")
     }
 
     func testReadCanonicalizesUnderscoreKeys() throws {
@@ -492,6 +499,32 @@ final class ConfigCommandTests: XCTestCase {
 
         XCTAssertEqual(try ConfigCommand.write(key: "meeting-hook-path", value: "none", defaults: defaults), "none")
         XCTAssertNil(defaults.string(forKey: MeetingAutomationHookConfiguration.executablePathKey))
+    }
+
+    /// The app reads these same keys, so a CLI-configured transcriber must be
+    /// the one the next meeting runs.
+    func testExternalTranscriberConfigIsWhatTheAppReads() throws {
+        XCTAssertEqual(try ConfigCommand.write(key: "external-transcriber-enabled", value: "on", defaults: defaults), "on")
+        XCTAssertEqual(
+            try ConfigCommand.write(key: "external-transcriber-command", value: "paraspeakrs", defaults: defaults),
+            ExternalTranscriberPreset.paraspeakrs.command
+        )
+        XCTAssertEqual(
+            try ConfigCommand.write(key: "external-transcriber-apply-command", value: "paraspeakrs", defaults: defaults),
+            ExternalTranscriberPreset.paraspeakrs.applyCommand
+        )
+        XCTAssertEqual(try ConfigCommand.write(key: "external-transcriber-timeout", value: "600", defaults: defaults), "600")
+
+        let configuration = ExternalTranscriberConfiguration.current(defaults: defaults)
+        XCTAssertTrue(configuration.isActive)
+        XCTAssertTrue(configuration.writesBackNames)
+        XCTAssertEqual(configuration.timeoutSeconds, 600)
+
+        XCTAssertEqual(try ConfigCommand.write(key: "external-transcriber-command", value: "none", defaults: defaults), "none")
+        XCTAssertFalse(ExternalTranscriberConfiguration.current(defaults: defaults).isActive)
+        XCTAssertThrowsError(
+            try ConfigCommand.write(key: "external-transcriber-timeout", value: "5", defaults: defaults)
+        ) { XCTAssertTrue($0 is ValidationError) }
     }
 
     func testMeetingHookConfigRejectsUnsafeValues() {

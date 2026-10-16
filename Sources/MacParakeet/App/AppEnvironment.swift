@@ -482,7 +482,9 @@ final class AppEnvironment {
             podcastAudioFetcher: PodcastAudioDownloader(),
             diarizationService: diarizationService,
             meetingArtifactStore: meetingArtifactStore,
-            speakerVoiceprints: AppFeatures.isVoiceProfilesAvailable() ? speakerVoiceprintService : nil
+            speakerVoiceprints: AppFeatures.isVoiceProfilesAvailable() ? speakerVoiceprintService : nil,
+            // Inert until the user enables a command in Settings (ADR-035).
+            externalTranscriber: ExternalTranscriberRunner()
         )
 
         meetingRecordingRecoveryService = MeetingRecordingRecoveryService(

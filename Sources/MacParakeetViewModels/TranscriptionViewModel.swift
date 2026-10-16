@@ -142,6 +142,8 @@ public final class TranscriptionViewModel {
             if !sameSpeakerSource {
                 speakerAttributionTranscriptionID = nil
                 speakerAttribution = nil
+                externalSpeakerNaming = nil
+                externalSpeakerWriteBackError = nil
                 speakerCorrectionsApplied = false
                 canUndoSpeakerCorrection = false
                 canRedoSpeakerCorrection = false
@@ -282,6 +284,19 @@ public final class TranscriptionViewModel {
     public private(set) var canRedoSpeakerCorrection = false
     public private(set) var isApplyingSpeakerCorrection = false
 
+    // MARK: External transcriber speakers (ADR-035)
+    // Logic lives in TranscriptionViewModel+ExternalSpeakers.swift.
+
+    /// Samples and suggestions of a meeting the external transcriber produced.
+    public internal(set) var externalSpeakerNaming: ExternalSpeakerNaming?
+    /// Last write-back failure; the MacParakeet correction itself is kept.
+    public internal(set) var externalSpeakerWriteBackError: String?
+    public internal(set) var isWritingBackExternalSpeakers = false
+    var externalSpeakerWriteBack: ExternalSpeakerWriteBacking?
+    @ObservationIgnored var externalSpeakerWriteBackTask: Task<Void, Never>?
+    @ObservationIgnored var externalSpeakerNamingLoadToken = UUID()
+    @ObservationIgnored var pendingExternalSpeakerWriteBacks = 0
+
     private struct EffectiveTranscriptionCacheKey: Equatable {
         let transcriptionRevision: UInt64
         let attributionTranscriptionID: UUID?
@@ -339,7 +354,7 @@ public final class TranscriptionViewModel {
 
     private var transcriptionService: TranscriptionServiceProtocol?
     private var audioTrackService: AudioTrackSelectingTranscriptionService?
-    private var transcriptionRepo: TranscriptionRepositoryProtocol?
+    private(set) var transcriptionRepo: TranscriptionRepositoryProtocol?
     private var promptResultRepo: PromptResultRepositoryProtocol?
     private var speakerAttributionReader: SpeakerAttributionReading?
     private var speakerCorrectionService: SpeakerCorrectionServicing?
@@ -438,7 +453,8 @@ public final class TranscriptionViewModel {
         promptResultsViewModel: PromptResultsViewModel? = nil,
         speakerAttributionReader: SpeakerAttributionReading? = nil,
         speakerCorrectionService: SpeakerCorrectionServicing? = nil,
-        speakerVoiceprints: SpeakerVoiceprintServicing? = nil
+        speakerVoiceprints: SpeakerVoiceprintServicing? = nil,
+        externalSpeakerWriteBack: ExternalSpeakerWriteBacking? = nil
     ) {
         self.transcriptionService = transcriptionService
         self.audioTrackService =
@@ -451,6 +467,7 @@ public final class TranscriptionViewModel {
         self.speakerAttributionReader = speakerAttributionReader
         self.speakerCorrectionService = speakerCorrectionService
         self.speakerVoiceprints = speakerVoiceprints
+        self.externalSpeakerWriteBack = externalSpeakerWriteBack
         isConfigured = true
         clearError()
         loadTranscriptions()
@@ -2143,6 +2160,7 @@ public final class TranscriptionViewModel {
                 )
                 if let current = self.currentTranscription, current.id == transcriptionID {
                     self.reofferVoiceEnrollment(for: current)
+                    self.refreshExternalSpeakerNaming(for: current)
                 }
                 return true
             } catch {
@@ -2307,6 +2325,7 @@ public final class TranscriptionViewModel {
                 loadSpeakerAttribution(for: currentTranscription)
             }
         }
+        enqueueExternalSpeakerWriteBack(transcriptionID: transcriptionID, attribution: result.attribution)
         // Artifact refresh generations are local monotonic tokens, independent
         // of correction revisions (which restart after retranscription).
         let artifactGeneration = (speakerRenameGenerations[transcriptionID] ?? 0) + 1

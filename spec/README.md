@@ -177,6 +177,7 @@ accepted direction is not proof that every phase is implemented or released.
 | [ADR-032](adr/032-llm-task-group-routing.md) | Per-task LLM selection — cleanup/analysis inherit default or pick a general route; Transforms inherit default; specialists not shipped |
 | [ADR-033](adr/033-explicit-voice-control.md) | Explicit Voice Control — implemented behind a default-off release flag; native/browser and speech qualification pending |
 | [ADR-034](adr/034-meeting-ask-workspace.md) | Independent, source-scoped Ask conversations with revision-bound evidence and a private Pi helper |
+| [ADR-035](adr/035-external-meeting-transcriber.md) | External meeting transcriber — a user command (paraspeakrs preset) replaces built-in meeting STT; speaker names written back to the tool |
 
 The [meeting import v1 contract](contracts/meeting-import-v1.md) defines the shared app/CLI input, ownership, and durable-result boundary.
 

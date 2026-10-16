@@ -127,7 +127,8 @@ final class AppEnvironmentConfigurer {
             // Same gate as the scoring path: with the feature unavailable the
             // view model holds no voiceprint service and offers nothing.
             speakerVoiceprints: AppFeatures.isVoiceProfilesAvailable()
-                ? env.speakerVoiceprintService : nil
+                ? env.speakerVoiceprintService : nil,
+            externalSpeakerWriteBack: ExternalSpeakerWriteBack()
         )
         let dictationService = env.dictationService
         historyViewModel.configure(

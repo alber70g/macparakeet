@@ -900,6 +900,19 @@ macparakeet-cli config set meeting-hook-timeout 20
 macparakeet-cli config set meeting-hook-enabled on
 ```
 
+To have a meeting transcribed by your own local tool instead of the built-in
+engine, configure the external transcriber
+([contract](../spec/contracts/external-transcriber-v1.md)). The command reads
+`$MACPARAKEET_AUDIO`, writes `transcript.json` into `$MACPARAKEET_OUT_DIR`, and
+applies to recorded and imported meetings. The optional apply command runs
+after speakers are named in the app, so the tool can learn the names.
+
+```bash
+macparakeet-cli config set external-transcriber-command paraspeakrs
+macparakeet-cli config set external-transcriber-apply-command paraspeakrs
+macparakeet-cli config set external-transcriber-enabled on
+```
+
 Meeting commands that support `--envelope` return an opt-in success envelope:
 
 ```json

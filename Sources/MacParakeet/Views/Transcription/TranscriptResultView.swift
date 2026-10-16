@@ -5375,6 +5375,15 @@ struct TranscriptResultView: View {
                                         tint: DesignSystem.Colors.textSecondary)
                                 }
                             }
+
+                            if let external = viewModel.externalSpeaker(for: speaker.id) {
+                                ExternalSpeakerControls(
+                                    speaker: external,
+                                    isBusy: viewModel.isWritingBackExternalSpeakers || mutationsDisabled
+                                ) {
+                                    viewModel.confirmExternalSpeakerSuggestion(speakerID: speaker.id)
+                                }
+                            }
                         }
 
                         Spacer()
@@ -5450,6 +5459,15 @@ struct TranscriptResultView: View {
                                 }
                                 .disabled(AudioSource(rawValue: speaker.id) != nil)
                             }
+
+                            // Matches the external tool's drop: the speaker's
+                            // lines leave the transcript too. Undo restores both.
+                            if viewModel.externalSpeaker(for: speaker.id) != nil {
+                                Divider()
+                                Button("Drop speaker and their lines", role: .destructive) {
+                                    Task { await viewModel.dropExternalSpeaker(speakerID: speaker.id) }
+                                }
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                         }
@@ -5467,6 +5485,13 @@ struct TranscriptResultView: View {
                 Text("Speaker labels are approximate.")
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(DesignSystem.Colors.textTertiary)
+
+                if viewModel.externalSpeakerNaming != nil {
+                    ExternalSpeakerWriteBackStatus(
+                        isWriting: viewModel.isWritingBackExternalSpeakers,
+                        error: viewModel.externalSpeakerWriteBackError
+                    )
+                }
             }
         }
         .padding(DesignSystem.Spacing.md)

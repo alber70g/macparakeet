@@ -1459,6 +1459,10 @@ struct SettingsView: View {
 
                 Divider()
 
+                ExternalTranscriberSettingsView()
+
+                Divider()
+
                 settingsToggleRow(
                     title: "Also save meetings to a folder",
                     detail: "MacParakeet always keeps the complete meeting in its library. Turn this on to also save a copy, in the format you choose, to a folder.",

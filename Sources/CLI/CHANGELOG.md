@@ -94,6 +94,15 @@ by checking exit code first: `2` = misuse, `1` = runtime, `0` = success.
 
 ## [Unreleased]
 
+### Added
+
+- `config` keys `external-transcriber-enabled`, `external-transcriber-command`,
+  `external-transcriber-apply-command` and `external-transcriber-timeout`
+  (ADR-035). When enabled, `meetings import` transcribes with the command
+  instead of the built-in engine. The value `paraspeakrs` selects the
+  paraspeakrs preset for either command key. `retranscribe` always resolves a
+  built-in engine and does not run the command.
+
 ### Fixed
 
 - A provider request that hits its idle timeout reports `errorType` `timeout`

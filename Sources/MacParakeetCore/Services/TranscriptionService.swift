@@ -353,6 +353,8 @@ public actor TranscriptionService:
     private let meetingCleanedMicrophoneReadinessPolicy: MeetingCleanedMicrophoneReadinessPolicy
     private let meetingFinalizationBenchmarkObserver: MeetingFinalizationBenchmarkObserver?
     private let speakerVoiceprints: SpeakerVoiceprintServicing?
+    private let externalTranscriber: ExternalTranscriberRunning?
+    private let externalTranscriberConfiguration: @Sendable () -> ExternalTranscriberConfiguration
 
     public init(
         audioProcessor: AudioProcessorProtocol,
@@ -387,7 +389,9 @@ public actor TranscriptionService:
         meetingArtifactStore: MeetingArtifactStoring? = MeetingArtifactStore(),
         meetingAutomationHookRunner: MeetingAutomationHookRunning? = MeetingAutomationHookRunner(),
         meetingCleanedMicrophoneReadinessPolicy: MeetingCleanedMicrophoneReadinessPolicy = .production,
-        speakerVoiceprints: SpeakerVoiceprintServicing? = nil
+        speakerVoiceprints: SpeakerVoiceprintServicing? = nil,
+        externalTranscriber: ExternalTranscriberRunning? = nil,
+        externalTranscriberConfiguration: (@Sendable () -> ExternalTranscriberConfiguration)? = nil
     ) {
         self.init(
             audioProcessor: audioProcessor,
@@ -423,7 +427,9 @@ public actor TranscriptionService:
             meetingAutomationHookRunner: meetingAutomationHookRunner,
             meetingCleanedMicrophoneReadinessPolicy: meetingCleanedMicrophoneReadinessPolicy,
             meetingFinalizationBenchmarkObserver: nil,
-            speakerVoiceprints: speakerVoiceprints
+            speakerVoiceprints: speakerVoiceprints,
+            externalTranscriber: externalTranscriber,
+            externalTranscriberConfiguration: externalTranscriberConfiguration
         )
     }
 
@@ -461,7 +467,9 @@ public actor TranscriptionService:
         meetingAutomationHookRunner: MeetingAutomationHookRunning? = MeetingAutomationHookRunner(),
         meetingCleanedMicrophoneReadinessPolicy: MeetingCleanedMicrophoneReadinessPolicy = .production,
         meetingFinalizationBenchmarkObserver: MeetingFinalizationBenchmarkObserver?,
-        speakerVoiceprints: SpeakerVoiceprintServicing? = nil
+        speakerVoiceprints: SpeakerVoiceprintServicing? = nil,
+        externalTranscriber: ExternalTranscriberRunning? = nil,
+        externalTranscriberConfiguration: (@Sendable () -> ExternalTranscriberConfiguration)? = nil
     ) {
         self.audioProcessor = audioProcessor
         self.sttTranscriber = sttTranscriber
@@ -499,6 +507,8 @@ public actor TranscriptionService:
         self.meetingCleanedMicrophoneReadinessPolicy = meetingCleanedMicrophoneReadinessPolicy
         self.meetingFinalizationBenchmarkObserver = meetingFinalizationBenchmarkObserver
         self.speakerVoiceprints = speakerVoiceprints
+        self.externalTranscriber = externalTranscriber
+        self.externalTranscriberConfiguration = externalTranscriberConfiguration ?? { .current() }
     }
 
     public func transcribe(
@@ -896,6 +906,9 @@ public actor TranscriptionService:
                 persistFailureStatus: false,
                 speechEngineOverride: speechEngine,
                 diarizationServiceOverride: runDiarizationService,
+                // Choosing a built-in engine explicitly is how a meeting is
+                // transcribed without the external transcriber.
+                allowExternalTranscriber: speechEngineOverride == nil,
                 onProgress: onProgress
             )
         }
@@ -1493,12 +1506,15 @@ public actor TranscriptionService:
         persistFailureStatus: Bool = true,
         speechEngineOverride: SpeechEngineSelection? = nil,
         diarizationServiceOverride: (any DiarizationServiceProtocol)? = nil,
+        allowExternalTranscriber: Bool = true,
         onProgress: (@Sendable (TranscriptionProgress) -> Void)? = nil
     ) async throws -> Transcription {
         let processingStartedAt = Date()
         var lifecycleStage: TelemetryTranscriptionStage = .audioConversion
+        let externalConfiguration = allowExternalTranscriber ? activeExternalTranscriberConfiguration() : nil
         let activeDiarizationService = diarizationServiceOverride ?? diarizationService
-        let diarizationRequested = activeDiarizationService != nil
+        let diarizationRequested = externalConfiguration == nil
+            && activeDiarizationService != nil
             && (diarizationServiceOverride != nil || shouldDiarizeMeetings())
             && recording.sourceAlignment.system != nil
         var temporaryWavURLs: [URL] = []
@@ -1510,6 +1526,36 @@ public actor TranscriptionService:
         }
 
         do {
+            if let externalConfiguration, let externalTranscriber {
+                lifecycleStage = .stt
+                onProgress?(.transcribing(percent: 0))
+                let outputFolder = ExternalTranscriberConfiguration.outputFolder(inMeetingFolder: recording.folderURL)
+                let external = try await externalTranscriber.transcribe(
+                    audioURL: recording.mixedAudioURL,
+                    outputFolder: outputFolder,
+                    meetingID: transcription.id,
+                    configuration: externalConfiguration
+                )
+                let imported = external.imported()
+                onProgress?(.finalizing)
+                return try await completeMeetingTranscript(
+                    rawTranscript: imported.rawTranscript,
+                    words: imported.words,
+                    speakers: imported.speakers,
+                    diarizationSegments: imported.diarizationSegments,
+                    language: external.language,
+                    engine: ExternalTranscriberConfiguration.engineName,
+                    engineVariant: externalConfiguration.commandName,
+                    recording: recording,
+                    transcription: &transcription,
+                    operation: operation,
+                    lifecycleStage: &lifecycleStage,
+                    processingStartedAt: processingStartedAt,
+                    diarizationRequested: false,
+                    diarizationApplied: false
+                )
+            }
+
             let sourceResults = try await transcribeMeetingSources(
                 recording: recording,
                 lifecycleStage: &lifecycleStage,
@@ -1547,54 +1593,21 @@ public actor TranscriptionService:
             )
             meetingFinalizationBenchmarkObserver?.stageDidEnd(.finalizeMerge)
 
-            // Apply the user's Vocabulary corrections to the meeting transcript.
-            // Meetings otherwise never run custom words — the deterministic
-            // pipeline only touches dictation/file transcripts — so names the
-            // user has already corrected elsewhere would still come through raw
-            // here (issue #550). Intentionally always-on, not gated on the
-            // Raw/Clean dictation mode: the corrections drive the
-            // speaker-segmented view and the word-timestamp exports, and the
-            // default processing mode is `.raw`. `completeTranscription` below
-            // still receives the *uncorrected* `finalized.rawTranscript` and skips
-            // the dictation Clean pipeline, so filler removal cannot rewrite the
-            // verbatim meeting record.
-            let corrected = MeetingTranscriptVocabularyApplier.apply(
-                rawTranscript: finalized.rawTranscript,
-                words: finalized.words,
-                customWords: fetchMeetingVocabulary()
-            )
-            transcription.rawTranscript = corrected.rawTranscript
-            transcription.wordTimestamps = corrected.words
-            transcription.language = Self.commonDetectedLanguage(from: sourceResults) ?? transcription.language
             // Both meeting source transcripts (mic + system) run through the
             // same `SpeechEngineSelection`, so taking the first source's
             // engine attribution is authoritative for the merged transcript.
-            if let engineSource = sourceResults.first {
-                transcription.engine = engineSource.result.engine.rawValue
-                transcription.engineVariant = engineSource.result.engineVariant
-            }
-            // Meeting duration describes playable media, not STT token extent
-            // or wall-clock session time. Engines can emit timestamps beyond
-            // the file edge; those must not inflate the saved recording.
-            transcription.durationMs = recording.playableDurationMs
-            transcription.meetingCaptureReport = recording.captureReport
-                ?? transcription.meetingCaptureReport
-            transcription.speakers = finalized.speakers
-            let participants = SpeakerInfo.participants(in: finalized.speakers)
-            transcription.speakerCount = participants.isEmpty ? nil : participants.count
-            transcription.diarizationSegments = finalized.diarizationSegments.isEmpty ? nil : finalized.diarizationSegments
-            let transcriptSegments = TranscriptSegmenter.materializeSegments(
-                words: corrected.words,
-                speakers: finalized.speakers
-            )
-            transcription.transcriptSegments = transcriptSegments.isEmpty ? nil : transcriptSegments
-
-            lifecycleStage = .postProcessing
-            let completed = try await completeTranscription(
-                source: .meeting,
+            let completed = try await completeMeetingTranscript(
+                rawTranscript: finalized.rawTranscript,
+                words: finalized.words,
+                speakers: finalized.speakers,
+                diarizationSegments: finalized.diarizationSegments,
+                language: Self.commonDetectedLanguage(from: sourceResults),
+                engine: sourceResults.first?.result.engine.rawValue,
+                engineVariant: sourceResults.first?.result.engineVariant,
+                recording: recording,
                 transcription: &transcription,
                 operation: operation,
-                rawText: finalized.rawTranscript,
+                lifecycleStage: &lifecycleStage,
                 processingStartedAt: processingStartedAt,
                 diarizationRequested: diarizationRequested,
                 diarizationApplied: systemDiarization != nil
@@ -1665,6 +1678,82 @@ public actor TranscriptionService:
             }
             throw error
         }
+    }
+
+    /// The external transcriber's settings when it should replace built-in
+    /// meeting STT: a runner is wired and the user enabled a command.
+    private func activeExternalTranscriberConfiguration() -> ExternalTranscriberConfiguration? {
+        guard externalTranscriber != nil else { return nil }
+        let configuration = externalTranscriberConfiguration()
+        return configuration.isActive ? configuration : nil
+    }
+
+    /// Stores a finished meeting transcript, whichever engine produced it.
+    private func completeMeetingTranscript(
+        rawTranscript: String,
+        words: [WordTimestamp],
+        speakers: [SpeakerInfo],
+        diarizationSegments: [DiarizationSegmentRecord],
+        language: String?,
+        engine: String?,
+        engineVariant: String?,
+        recording: MeetingRecordingOutput,
+        transcription: inout Transcription,
+        operation: TranscriptionOperationContext,
+        lifecycleStage: inout TelemetryTranscriptionStage,
+        processingStartedAt: Date,
+        diarizationRequested: Bool,
+        diarizationApplied: Bool
+    ) async throws -> Transcription {
+        // Apply the user's Vocabulary corrections to the meeting transcript.
+        // Meetings otherwise never run custom words — the deterministic
+        // pipeline only touches dictation/file transcripts — so names the
+        // user has already corrected elsewhere would still come through raw
+        // here (issue #550). Intentionally always-on, not gated on the
+        // Raw/Clean dictation mode: the corrections drive the
+        // speaker-segmented view and the word-timestamp exports, and the
+        // default processing mode is `.raw`. `completeTranscription` below
+        // still receives the *uncorrected* raw transcript and skips
+        // the dictation Clean pipeline, so filler removal cannot rewrite the
+        // verbatim meeting record.
+        let corrected = MeetingTranscriptVocabularyApplier.apply(
+            rawTranscript: rawTranscript,
+            words: words,
+            customWords: fetchMeetingVocabulary()
+        )
+        transcription.rawTranscript = corrected.rawTranscript
+        transcription.wordTimestamps = corrected.words
+        transcription.language = language ?? transcription.language
+        if let engine {
+            transcription.engine = engine
+            transcription.engineVariant = engineVariant
+        }
+        // Meeting duration describes playable media, not STT token extent
+        // or wall-clock session time. Engines can emit timestamps beyond
+        // the file edge; those must not inflate the saved recording.
+        transcription.durationMs = recording.playableDurationMs
+        transcription.meetingCaptureReport = recording.captureReport
+            ?? transcription.meetingCaptureReport
+        transcription.speakers = speakers
+        let participants = SpeakerInfo.participants(in: speakers)
+        transcription.speakerCount = participants.isEmpty ? nil : participants.count
+        transcription.diarizationSegments = diarizationSegments.isEmpty ? nil : diarizationSegments
+        let transcriptSegments = TranscriptSegmenter.materializeSegments(
+            words: corrected.words,
+            speakers: speakers
+        )
+        transcription.transcriptSegments = transcriptSegments.isEmpty ? nil : transcriptSegments
+
+        lifecycleStage = .postProcessing
+        return try await completeTranscription(
+            source: .meeting,
+            transcription: &transcription,
+            operation: operation,
+            rawText: rawTranscript,
+            processingStartedAt: processingStartedAt,
+            diarizationRequested: diarizationRequested,
+            diarizationApplied: diarizationApplied
+        )
     }
 
     private func transcribeMeetingSources(

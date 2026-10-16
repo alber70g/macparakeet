@@ -141,6 +141,11 @@ The v1 folder can contain these stable filenames:
   written duration to a repaired file's sample rate (clamped to surviving
   media), refreshes the playable timeline from the repaired media, and drops
   tracks whose media cannot be recovered.
+- `external-transcript/`: optional output folder of the external meeting
+  transcriber (ADR-035, [contract](external-transcriber-v1.md)): the tool's
+  `transcript.json`, per-speaker sample WAV files, a `dropped/` subfolder and
+  any files the tool adds. Audio retention does not remove it; deleting the
+  meeting does.
 - `manifest.json`: folder manifest.
 - `meeting.md`: deterministic Markdown view for users and local agents. It
   keeps YAML frontmatter with local metadata and stable sections for title,

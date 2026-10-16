@@ -1694,6 +1694,28 @@ another, which is what keeps recurring-unknown detection (the literal ask in
 - [ ] Held-out meeting evaluation and native consent/deletion workflow qualification
   (release gates)
 
+### F13b: External Meeting Transcriber (ADR-035)
+
+**What:** A user-configured command replaces built-in meeting transcription and
+speaker detection. paraspeakrs ships as a preset. The command writes
+`transcript.json` ([contract](contracts/external-transcriber-v1.md)); the
+meeting imports its words, timings and speakers.
+
+**Status:** milestone 1 (recorded and imported meetings) on the
+`feat/external-transcriber` branch. Disabled by default; Settings → Meeting
+Recording or `macparakeet-cli config`.
+
+**Behavior:**
+- [x] Failure leaves the meeting in Error with audio kept; Retry runs the
+  command again; choosing a built-in engine in Retranscribe bypasses it
+- [x] Speaker overview: play sample, rename, merge, Confirm suggestion, Drop
+  speaker and their lines (undoable)
+- [x] Names are written back as paraspeakrs sample file names, then the apply
+  command runs
+- [x] Samples stay until the meeting is deleted; audio retention does not
+  remove them
+- [ ] File and URL transcription (milestone 2)
+
 ---
 
 ### F14: Non-Blocking Transcription Progress
