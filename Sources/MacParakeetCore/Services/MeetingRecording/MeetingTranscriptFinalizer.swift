@@ -37,9 +37,13 @@ struct MeetingTranscriptFinalizer {
         let durationMs: Int?
     }
 
+    /// `wholeMeetingDiarization` (an external detector, ADR-035) covers the
+    /// meeting timeline, microphone included: every word takes its speaker
+    /// from it, and `systemDiarization` is ignored.
     static func finalize(
         sourceTranscripts: [SourceTranscript],
-        systemDiarization: SystemDiarization? = nil
+        systemDiarization: SystemDiarization? = nil,
+        wholeMeetingDiarization: SystemDiarization? = nil
     ) -> FinalizedTranscript {
         let normalized = sourceTranscripts.sorted { lhs, rhs in
             if lhs.startOffsetMs == rhs.startOffsetMs {
@@ -64,10 +68,16 @@ struct MeetingTranscriptFinalizer {
             microphoneWords: shiftedWordsBySource[.microphone] ?? [],
             systemWords: systemWords
         )
-        let microphoneWords = sourceReconciliation.microphoneWords
+        var microphoneWords = sourceReconciliation.microphoneWords
         let finalizedSystemWords: [WordTimestamp]
-        if let systemDiarization {
-            finalizedSystemWords = attributeSystemWords(systemWords, segments: systemDiarization.segments)
+        let clusterDiarization = wholeMeetingDiarization ?? systemDiarization
+        if let wholeMeetingDiarization {
+            microphoneWords = attributeWords(
+                microphoneWords, segments: wholeMeetingDiarization.segments, unclaimed: .microphone)
+            finalizedSystemWords = attributeWords(
+                systemWords, segments: wholeMeetingDiarization.segments, unclaimed: .system)
+        } else if let systemDiarization {
+            finalizedSystemWords = attributeWords(systemWords, segments: systemDiarization.segments, unclaimed: .system)
         } else {
             finalizedSystemWords = systemWords
         }
@@ -81,7 +91,7 @@ struct MeetingTranscriptFinalizer {
             return $0.startMs < $1.startMs
         }
 
-        let speakers = activeSpeakers(from: mergedWords, systemDiarization: systemDiarization)
+        let speakers = activeSpeakers(from: mergedWords, systemDiarization: clusterDiarization)
         let diarizationSegments = buildDiarizationSegments(from: mergedWords)
         let rawTranscript = finalTranscriptText(
             from: normalized,
@@ -98,16 +108,17 @@ struct MeetingTranscriptFinalizer {
         )
     }
 
-    /// Assigns system-track words to diarized clusters.
+    /// Assigns one source's words to diarized clusters.
     ///
     /// The words enter the merger unassigned, so a word that no segment
     /// overlaps gets the same gap fill as in a file transcript. A word still
-    /// unassigned afterwards returns to the raw `system` id: it stays on the
-    /// system track rather than inheriting the preceding `Me` turn, and the
+    /// unassigned afterwards returns to its source id: a system word stays on
+    /// the system track rather than inheriting the preceding `Me` turn, and the
     /// roster labels it unattributed (#1228).
-    private static func attributeSystemWords(
+    private static func attributeWords(
         _ words: [WordTimestamp],
-        segments: [SpeakerSegment]
+        segments: [SpeakerSegment],
+        unclaimed source: AudioSource
     ) -> [WordTimestamp] {
         let unassigned = words.map { word in
             var word = word
@@ -118,7 +129,7 @@ struct MeetingTranscriptFinalizer {
             .map { word in
                 guard word.speakerId == nil else { return word }
                 var word = word
-                word.speakerId = AudioSource.system.rawValue
+                word.speakerId = source.rawValue
                 return word
             }
     }

@@ -170,6 +170,10 @@ public protocol DiarizationServiceProtocol: Sendable {
         speakerConstraint: SpeakerDiarizationConstraint?,
         context: DiarizationRunContext?
     ) async throws -> MacParakeetDiarizationResult
+    /// Whether this detector finds everyone in a meeting from the whole
+    /// recording, microphone included. The built-in diarizers only split the
+    /// system side and leave the microphone as "Me".
+    func diarizesWholeMeeting() async -> Bool
     func prepareModels(onProgress: (@Sendable (String) -> Void)?) async throws
     func isReady() async -> Bool
     func hasCachedModels() async -> Bool
@@ -206,6 +210,10 @@ extension DiarizationServiceProtocol {
 
     public func explicitSpeakerConstraint() async -> SpeakerDiarizationConstraint? {
         nil
+    }
+
+    public func diarizesWholeMeeting() async -> Bool {
+        false
     }
 
     public func prepareModels() async throws {

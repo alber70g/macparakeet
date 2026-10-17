@@ -1498,9 +1498,12 @@ public actor TranscriptionService:
         let processingStartedAt = Date()
         var lifecycleStage: TelemetryTranscriptionStage = .audioConversion
         let activeDiarizationService = diarizationServiceOverride ?? diarizationService
+        // An external detector (ADR-035) diarizes the whole meeting, so it
+        // also runs for microphone-only recordings.
+        let diarizesWholeMeeting = await activeDiarizationService?.diarizesWholeMeeting() ?? false
         let diarizationRequested = activeDiarizationService != nil
             && (diarizationServiceOverride != nil || shouldDiarizeMeetings())
-            && recording.sourceAlignment.system != nil
+            && (diarizesWholeMeeting || recording.sourceAlignment.system != nil)
         var temporaryWavURLs: [URL] = []
         var sourceWavURLs: [AudioSource: URL] = [:]
         defer {
@@ -1519,32 +1522,42 @@ public actor TranscriptionService:
                 onProgress: onProgress
             )
 
-            let systemDiarization: MeetingTranscriptFinalizer.SystemDiarization?
-            if diarizationRequested {
+            var systemDiarization: MeetingTranscriptFinalizer.SystemDiarization?
+            var wholeMeetingDiarization: MeetingTranscriptFinalizer.SystemDiarization?
+            if diarizationRequested, let activeDiarizationService {
                 meetingFinalizationBenchmarkObserver?.stageDidStart(.diarization)
                 do {
-                    systemDiarization = try await diarizeMeetingSystemIfNeeded(
-                        recording: recording,
-                        transcriptionID: transcription.id,
-                        sourceWavURLs: sourceWavURLs,
-                        requested: true,
-                        diarizationService: activeDiarizationService,
-                        lifecycleStage: &lifecycleStage,
-                        onProgress: onProgress
-                    )
+                    if diarizesWholeMeeting {
+                        wholeMeetingDiarization = try await diarizeWholeMeeting(
+                            recording: recording,
+                            transcriptionID: transcription.id,
+                            diarizationService: activeDiarizationService,
+                            lifecycleStage: &lifecycleStage,
+                            onProgress: onProgress
+                        )
+                    } else {
+                        systemDiarization = try await diarizeMeetingSystemIfNeeded(
+                            recording: recording,
+                            transcriptionID: transcription.id,
+                            sourceWavURLs: sourceWavURLs,
+                            requested: true,
+                            diarizationService: activeDiarizationService,
+                            lifecycleStage: &lifecycleStage,
+                            onProgress: onProgress
+                        )
+                    }
                     meetingFinalizationBenchmarkObserver?.stageDidEnd(.diarization)
                 } catch {
                     meetingFinalizationBenchmarkObserver?.stageDidEnd(.diarization)
                     throw error
                 }
-            } else {
-                systemDiarization = nil
             }
 
             meetingFinalizationBenchmarkObserver?.stageDidStart(.finalizeMerge)
             let finalized = MeetingTranscriptFinalizer.finalize(
                 sourceTranscripts: sourceResults,
-                systemDiarization: systemDiarization
+                systemDiarization: systemDiarization,
+                wholeMeetingDiarization: wholeMeetingDiarization
             )
             meetingFinalizationBenchmarkObserver?.stageDidEnd(.finalizeMerge)
 
@@ -1598,7 +1611,7 @@ public actor TranscriptionService:
                 rawText: finalized.rawTranscript,
                 processingStartedAt: processingStartedAt,
                 diarizationRequested: diarizationRequested,
-                diarizationApplied: systemDiarization != nil
+                diarizationApplied: systemDiarization != nil || wholeMeetingDiarization != nil
             )
 
             await scoreVoiceprintsIfEnabled(for: completed, systemDiarization: systemDiarization)
@@ -1793,6 +1806,70 @@ public actor TranscriptionService:
                 speechSeconds: Double(systemDiarization.speechMsBySpeaker[speaker.id] ?? 0) / 1000,
                 captureDomain: .system
             )
+        }
+    }
+
+    /// External detection over the meeting playback (ADR-035): the stereo
+    /// file whose sides are the microphone and the system audio, on the same
+    /// timeline as the transcript's words. Speakers are stored as
+    /// `external:<id>`, apart from the `microphone`/`system` source ids that
+    /// words no turn covers keep. A failure keeps the transcript without
+    /// speakers, like the system-side path.
+    private func diarizeWholeMeeting(
+        recording: MeetingRecordingOutput,
+        transcriptionID: UUID,
+        diarizationService: any DiarizationServiceProtocol,
+        lifecycleStage: inout TelemetryTranscriptionStage,
+        onProgress: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> MeetingTranscriptFinalizer.SystemDiarization? {
+        lifecycleStage = .diarization
+        do {
+            try Task.checkCancellation()
+            onProgress?(.identifyingSpeakers)
+            Telemetry.send(.diarizationStarted(source: .meeting))
+            let diarStartedAt = Date()
+            let diarResult = try await diarizationService.diarize(
+                audioURL: recording.mixedAudioURL,
+                speakerConstraint: nil,
+                context: DiarizationRunContext(
+                    transcriptionID: transcriptionID,
+                    outputFolder: ExternalSpeakerDetectionLocation.outputFolder(inMeetingFolder: recording.folderURL)
+                )
+            )
+            try Task.checkCancellation()
+            let diarDuration = Date().timeIntervalSince(diarStartedAt)
+            logger.notice(
+                "meeting_whole_diarization_completed speakers=\(diarResult.speakerCount, privacy: .public) segments=\(diarResult.segments.count, privacy: .public) duration_s=\(String(format: "%.2f", diarDuration), privacy: .public)"
+            )
+            Telemetry.send(.diarizationCompleted(
+                source: .meeting,
+                speakerCount: diarResult.speakerCount,
+                durationSeconds: diarDuration,
+                speakerPrior: nil
+            ))
+            guard !diarResult.segments.isEmpty else { return nil }
+
+            let prefix = ExternalSpeakerDetectionLocation.wholeMeetingIDPrefix
+            return MeetingTranscriptFinalizer.SystemDiarization(
+                speakers: diarResult.speakers.map { SpeakerInfo(id: prefix + $0.id, label: $0.label) },
+                segments: diarResult.segments.map {
+                    SpeakerSegment(speakerId: prefix + $0.speakerId, startMs: $0.startMs, endMs: $0.endMs)
+                },
+                speechMsBySpeaker: Dictionary(
+                    uniqueKeysWithValues: diarResult.speechMsBySpeaker.map { (prefix + $0.key, $0.value) }
+                )
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try Task.checkCancellation()
+            logger.error("meeting_whole_diarization_failed error=\(error.localizedDescription, privacy: .public)")
+            Telemetry.send(.diarizationFailed(
+                source: .meeting,
+                errorType: String(describing: type(of: error)),
+                errorDetail: TelemetryErrorClassifier.errorDetail(error)
+            ))
+            return nil
         }
     }
 

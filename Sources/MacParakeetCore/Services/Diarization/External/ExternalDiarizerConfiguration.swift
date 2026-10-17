@@ -116,9 +116,13 @@ public enum ExternalSpeakerDetectionLocation {
             .appendingPathComponent(id.uuidString, isDirectory: true)
     }
 
-    /// Meetings diarize only the system side, whose speakers are stored as
-    /// `system:<detector id>`; other transcriptions keep the detector's IDs.
+    /// A meeting's external speakers cover microphone and system alike, so
+    /// they are kept apart from the `microphone`/`system` source ids.
+    public static let wholeMeetingIDPrefix = "external:"
+
+    /// How the detector's speaker IDs are stored in a transcription: prefixed
+    /// in meetings, unchanged in file transcriptions.
     public static func transcriptIDPrefix(for transcription: Transcription) -> String {
-        transcription.sourceType == .meeting ? AudioSource.system.rawValue + ":" : ""
+        transcription.sourceType == .meeting ? wholeMeetingIDPrefix : ""
     }
 }

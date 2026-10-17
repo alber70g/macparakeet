@@ -57,6 +57,10 @@ public struct ExternalDiarizationService: DiarizationServiceProtocol {
         }
     }
 
+    /// paraspeakrs diarizes each side of the stereo meeting playback, so people
+    /// in the room on the microphone are found too.
+    public func diarizesWholeMeeting() async -> Bool { true }
+
     public func prepareModels(onProgress: (@Sendable (String) -> Void)?) async throws {}
 
     public func isReady() async -> Bool { true }
@@ -115,6 +119,8 @@ public struct SelectableDiarizationService: DiarizationServiceProtocol {
         }
         return try await external.diarize(audioURL: audioURL, speakerConstraint: speakerConstraint, context: context)
     }
+
+    public func diarizesWholeMeeting() async -> Bool { await active.diarizesWholeMeeting() }
 
     public func prepareModels(onProgress: (@Sendable (String) -> Void)?) async throws {
         try await active.prepareModels(onProgress: onProgress)

@@ -34,7 +34,11 @@ final class TranscriptionServiceExternalDiarizationTests: XCTestCase {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    func testMeetingSpeakersComeFromTheCommandAndKeepItsNames() async throws {
+    /// People in the room speak into the microphone. The command diarizes the
+    /// whole playback, so microphone words get speakers too instead of all
+    /// becoming "Me" (the meeting that showed 1 speaker in MacParakeet and 3
+    /// in the paraspeakrs TUI).
+    func testMeetingSpeakersComeFromTheWholePlaybackMicrophoneIncluded() async throws {
         await mockSTT.configureSequence(results: meetingSTTResults())
         let service = makeService(externalActive: true)
 
@@ -43,20 +47,32 @@ final class TranscriptionServiceExternalDiarizationTests: XCTestCase {
         let builtInCalled = await builtIn.diarizeCalled
         XCTAssertFalse(builtInCalled, "The built-in diarizer must not run when the command is selected")
         let call = try XCTUnwrap(runner.calls.first)
+        XCTAssertEqual(call.audio, folder.appendingPathComponent("meeting-playback.m4a"))
         XCTAssertEqual(call.output, folder.appendingPathComponent("speaker-detection", isDirectory: true))
         XCTAssertEqual(call.transcriptionID, result.id)
-        // The voice library's name survives the meeting's "Others N" numbering.
-        let system = result.speakers?.filter { $0.id.hasPrefix("system:") }
-        XCTAssertEqual(
-            system,
-            [
-                SpeakerInfo(id: "system:L_SPEAKER_00", label: "Albert"),
-                SpeakerInfo(id: "system:R_SPEAKER_00", label: "Others 2"),
-            ])
         XCTAssertEqual(
             result.wordTimestamps?.map(\.speakerId),
-            ["microphone", "system:L_SPEAKER_00", "system:R_SPEAKER_00"]
+            // "Hallo" falls in no turn and keeps its source; "Ik" was said in
+            // the room during Albert's turn.
+            ["microphone", "external:L_SPEAKER_00", "external:R_SPEAKER_00", "external:L_SPEAKER_00"]
         )
+        // The voice library's name is kept; an unnamed speaker is numbered.
+        XCTAssertEqual(
+            result.speakers?.filter { $0.id.hasPrefix("external:") },
+            [
+                SpeakerInfo(id: "external:L_SPEAKER_00", label: "Albert"),
+                SpeakerInfo(id: "external:R_SPEAKER_00", label: "Speaker 2"),
+            ])
+    }
+
+    func testMicrophoneOnlyMeetingIsDiarizedToo() async throws {
+        await mockSTT.configureSequence(results: [meetingSTTResults()[0]])
+        let service = makeService(externalActive: true)
+
+        let result = try await service.transcribeMeeting(recording: recording(withSystem: false))
+
+        XCTAssertEqual(runner.calls.count, 1)
+        XCTAssertEqual(result.wordTimestamps?.map(\.speakerId), ["microphone", "external:L_SPEAKER_00"])
     }
 
     func testMeetingKeepsItsTranscriptWhenTheCommandFailsAndRecordsWhy() async throws {
@@ -67,8 +83,8 @@ final class TranscriptionServiceExternalDiarizationTests: XCTestCase {
         let result = try await service.transcribeMeeting(recording: recording())
 
         XCTAssertEqual(result.status, .completed)
-        XCTAssertEqual(result.wordTimestamps?.map(\.word), ["Hallo", "Ja", "Hoe"])
-        XCTAssertFalse(result.speakers?.contains { $0.id.hasPrefix("system:L") } ?? false)
+        XCTAssertEqual(result.wordTimestamps?.map(\.word), ["Hallo", "Ja", "Hoe", "Ik"])
+        XCTAssertFalse(result.speakers?.contains { $0.id.hasPrefix("external:") } ?? false)
         let builtInCalled = await builtIn.diarizeCalled
         XCTAssertFalse(builtInCalled, "A failed command must not silently fall back to the built-in diarizer")
         let message = ExternalDiarizationService.lastError(
@@ -165,12 +181,16 @@ final class TranscriptionServiceExternalDiarizationTests: XCTestCase {
         )
     }
 
-    /// Microphone first, then system: words at times the sample turns cover.
+    /// Microphone first, then system, against the sample turns: L_SPEAKER_00
+    /// 1.752-4.232 s and 10-11.5 s, R_SPEAKER_00 8.4-9.3 s.
     private func meetingSTTResults() -> [STTResult] {
         [
             STTResult(
-                text: "Hallo",
-                words: [TimestampedWord(word: "Hallo", startMs: 0, endMs: 400, confidence: 0.9)]
+                text: "Hallo Ik",
+                words: [
+                    TimestampedWord(word: "Hallo", startMs: 0, endMs: 400, confidence: 0.9),
+                    TimestampedWord(word: "Ik", startMs: 10_200, endMs: 10_500, confidence: 0.9),
+                ]
             ),
             STTResult(
                 text: "Ja Hoe",
@@ -182,7 +202,7 @@ final class TranscriptionServiceExternalDiarizationTests: XCTestCase {
         ]
     }
 
-    private func recording() -> MeetingRecordingOutput {
+    private func recording(withSystem: Bool = true) -> MeetingRecordingOutput {
         MeetingRecordingOutput(
             sessionID: UUID(),
             displayName: "Meeting",
@@ -196,9 +216,11 @@ final class TranscriptionServiceExternalDiarizationTests: XCTestCase {
                 microphone: .init(
                     firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 576_000,
                     sampleRate: 48_000),
-                system: .init(
-                    firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 576_000,
-                    sampleRate: 48_000)
+                system: withSystem
+                    ? .init(
+                        firstHostTime: nil, lastHostTime: nil, startOffsetMs: 0, writtenFrameCount: 576_000,
+                        sampleRate: 48_000)
+                    : nil
             )
         )
     }

@@ -5,8 +5,8 @@ import XCTest
 /// Write-back turns MacParakeet's effective speaker roster into paraspeakrs
 /// sample file names. A wrong name teaches the voice library the wrong voice,
 /// and a wrong drop removes a speaker in the tool, so each rule of ADR-035 is
-/// pinned here against real corrections on a meeting, whose system speakers
-/// are stored as `system:<detector id>`.
+/// pinned here against real corrections on a meeting, whose detector speakers
+/// are stored as `external:<detector id>`.
 final class ExternalSpeakerNamingTests: XCTestCase {
     private var meetingFolder: URL!
     private var outputFolder: URL!
@@ -33,10 +33,10 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     func testLoadFindsSamplesAndUnconfirmedSuggestion() throws {
         let naming = try XCTUnwrap(ExternalSpeakerNaming.load(outputFolder: outputFolder))
 
-        let albert = try XCTUnwrap(naming.speaker(forTranscriptID: "system:L_SPEAKER_00"))
+        let albert = try XCTUnwrap(naming.speaker(forTranscriptID: "external:L_SPEAKER_00"))
         XCTAssertEqual(albert.sampleURL?.lastPathComponent, "L_SPEAKER_00__Albert_0.77.wav")
         XCTAssertTrue(albert.hasUnconfirmedSuggestion)
-        let other = try XCTUnwrap(naming.speaker(forTranscriptID: "system:R_SPEAKER_00"))
+        let other = try XCTUnwrap(naming.speaker(forTranscriptID: "external:R_SPEAKER_00"))
         XCTAssertFalse(other.hasUnconfirmedSuggestion)
         XCTAssertNil(naming.speaker(forTranscriptID: "microphone"))
     }
@@ -51,7 +51,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     func testMeetingFolderLocationAndPrefixFollowTheTranscription() throws {
         let meeting = try meeting()
         XCTAssertEqual(ExternalSpeakerDetectionLocation.outputFolder(for: meeting), outputFolder)
-        XCTAssertEqual(ExternalSpeakerDetectionLocation.transcriptIDPrefix(for: meeting), "system:")
+        XCTAssertEqual(ExternalSpeakerDetectionLocation.transcriptIDPrefix(for: meeting), "external:")
 
         var file = meeting
         file.sourceType = .file
@@ -77,7 +77,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
 
         let targets = naming.plan(
             attribution: try resolve([
-                .rename(speakerID: "system:R_SPEAKER_00", label: "Randy")
+                .rename(speakerID: "external:R_SPEAKER_00", label: "Randy")
             ]))
 
         XCTAssertEqual(targets["R_SPEAKER_00"], .named("Randy"))
@@ -91,7 +91,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
 
         let targets = naming.plan(
             attribution: try resolve([
-                .rename(speakerID: "system:L_SPEAKER_00", label: "Steven")
+                .rename(speakerID: "external:L_SPEAKER_00", label: "Steven")
             ]))
 
         XCTAssertEqual(targets["L_SPEAKER_00"], .named("Steven"))
@@ -102,7 +102,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
 
         let targets = naming.plan(
             attribution: try resolve([
-                .merge(sourceSpeakerID: "system:R_SPEAKER_00", targetSpeakerID: "system:L_SPEAKER_00")
+                .merge(sourceSpeakerID: "external:R_SPEAKER_00", targetSpeakerID: "external:L_SPEAKER_00")
             ]))
 
         // The same name on two samples is how paraspeakrs merges speakers.
@@ -113,7 +113,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         let naming = try XCTUnwrap(ExternalSpeakerNaming.load(outputFolder: outputFolder))
         let automatic = try resolve([])
         let omissions = automatic.editableSegments
-            .filter { $0.assignment == .speaker(id: "system:R_SPEAKER_00") }
+            .filter { $0.assignment == .speaker(id: "external:R_SPEAKER_00") }
             .map {
                 TranscriptTextChange.omit(
                     target: SpeakerCorrectionTarget(
@@ -128,7 +128,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         let dropped = naming.plan(
             attribution: try resolve([
                 .reviseText(changes: omissions),
-                .remove(speakerID: "system:R_SPEAKER_00", reassignTo: .unassigned),
+                .remove(speakerID: "external:R_SPEAKER_00", reassignTo: .unassigned),
             ])
         )
         XCTAssertEqual(dropped["R_SPEAKER_00"], .dropped)
@@ -151,7 +151,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         )
         let naming = try XCTUnwrap(ExternalSpeakerNaming.load(outputFolder: outputFolder))
 
-        XCTAssertFalse(try XCTUnwrap(naming.speaker(forTranscriptID: "system:L_SPEAKER_00")).hasUnconfirmedSuggestion)
+        XCTAssertFalse(try XCTUnwrap(naming.speaker(forTranscriptID: "external:L_SPEAKER_00")).hasUnconfirmedSuggestion)
         // A later sync must not turn the confirmation back into a guess.
         XCTAssertEqual(naming.plan(attribution: try resolve([]))["L_SPEAKER_00"], .named("Albert"))
     }
@@ -166,7 +166,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         let applied = try await writeBack.sync(
             transcriptionID: meetingID,
             outputFolder: outputFolder,
-            attribution: try resolve([.rename(speakerID: "system:R_SPEAKER_00", label: "Randy")])
+            attribution: try resolve([.rename(speakerID: "external:R_SPEAKER_00", label: "Randy")])
         )
         XCTAssertTrue(applied)
         XCTAssertEqual(runner.applyCount, 1)
@@ -175,7 +175,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         let again = try await writeBack.sync(
             transcriptionID: meetingID,
             outputFolder: outputFolder,
-            attribution: try resolve([.rename(speakerID: "system:R_SPEAKER_00", label: "Randy")])
+            attribution: try resolve([.rename(speakerID: "external:R_SPEAKER_00", label: "Randy")])
         )
         XCTAssertFalse(again)
         XCTAssertEqual(runner.applyCount, 1)
@@ -190,7 +190,7 @@ final class ExternalSpeakerNamingTests: XCTestCase {
         try await writeBack.confirmSuggestion(
             transcriptionID: UUID(),
             outputFolder: outputFolder,
-            transcriptSpeakerID: "system:L_SPEAKER_00"
+            transcriptSpeakerID: "external:L_SPEAKER_00"
         )
 
         XCTAssertTrue(fileExists("L_SPEAKER_00__Albert.wav"))
@@ -209,22 +209,22 @@ final class ExternalSpeakerNamingTests: XCTestCase {
     }
 
     /// A meeting as the pipeline stores one after external detection: the
-    /// microphone is "Me", system speakers carry the `system:` prefix, and a
-    /// name the detector supplied is kept.
+    /// detector speakers carry the `external:` prefix, an uncovered word keeps
+    /// its source id ("Me"), and a name the detector supplied is kept.
     private func meeting() throws -> Transcription {
         if let cachedMeeting { return cachedMeeting }
         let words = [
             WordTimestamp(word: "Hallo.", startMs: 0, endMs: 400, confidence: 1, speakerId: "microphone"),
-            WordTimestamp(word: "Ja,", startMs: 1752, endMs: 2152, confidence: 1, speakerId: "system:L_SPEAKER_00"),
-            WordTimestamp(word: "man.", startMs: 3592, endMs: 4232, confidence: 1, speakerId: "system:L_SPEAKER_00"),
-            WordTimestamp(word: "Hoe", startMs: 8400, endMs: 8800, confidence: 1, speakerId: "system:R_SPEAKER_00"),
-            WordTimestamp(word: "is", startMs: 8800, endMs: 9000, confidence: 1, speakerId: "system:R_SPEAKER_00"),
-            WordTimestamp(word: "hij?", startMs: 9000, endMs: 9300, confidence: 1, speakerId: "system:R_SPEAKER_00"),
+            WordTimestamp(word: "Ja,", startMs: 1752, endMs: 2152, confidence: 1, speakerId: "external:L_SPEAKER_00"),
+            WordTimestamp(word: "man.", startMs: 3592, endMs: 4232, confidence: 1, speakerId: "external:L_SPEAKER_00"),
+            WordTimestamp(word: "Hoe", startMs: 8400, endMs: 8800, confidence: 1, speakerId: "external:R_SPEAKER_00"),
+            WordTimestamp(word: "is", startMs: 8800, endMs: 9000, confidence: 1, speakerId: "external:R_SPEAKER_00"),
+            WordTimestamp(word: "hij?", startMs: 9000, endMs: 9300, confidence: 1, speakerId: "external:R_SPEAKER_00"),
         ]
         let speakers = [
             SpeakerInfo(id: "microphone", label: "Me"),
-            SpeakerInfo(id: "system:L_SPEAKER_00", label: "Albert"),
-            SpeakerInfo(id: "system:R_SPEAKER_00", label: "Others 2"),
+            SpeakerInfo(id: "external:L_SPEAKER_00", label: "Albert"),
+            SpeakerInfo(id: "external:R_SPEAKER_00", label: "Speaker 2"),
         ]
         let transcription = Transcription(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!,

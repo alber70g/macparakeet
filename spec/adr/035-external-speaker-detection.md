@@ -34,19 +34,24 @@ transcriptions. MacParakeet always recognizes the words itself.
   without a restart, in the app and in `macparakeet-cli`.
 - The command runs through `LocalCLIExecutor` in the user's login shell, with
   the shell PATH the local-CLI LLM provider already discovers.
-- Inputs are environment variables only: `MACPARAKEET_AUDIO` (the audio the
-  built-in diarizer would get: a meeting's system-audio WAV, or a file
-  transcription's converted WAV), `MACPARAKEET_OUT_DIR` (a fresh, empty
-  folder) and `MACPARAKEET_TRANSCRIPTION_ID`. Paths are never substituted into
-  the command string.
+- Inputs are environment variables only: `MACPARAKEET_AUDIO`,
+  `MACPARAKEET_OUT_DIR` (a fresh, empty folder) and
+  `MACPARAKEET_TRANSCRIPTION_ID`. Paths are never substituted into the
+  command string.
+- For a meeting, `MACPARAKEET_AUDIO` is `meeting-playback.m4a`: the whole
+  meeting in stereo, microphone on one side and system audio on the other, on
+  the transcript's timeline. The built-in diarizer only splits the system side
+  and labels the microphone "Me"; that fails for people in the same room, who
+  all speak into the microphone. paraspeakrs diarizes each stereo side, so it
+  finds them. For a file transcription it is the converted WAV.
 - The command writes `diarization.json` (contract:
   [external-diarizer-v1](../contracts/external-diarizer-v1.md)): speakers
-  and their turns. MacParakeet assigns its own words to those turns exactly as
-  it does with built-in diarization. In a meeting, the turns cover the system
-  side; the microphone stays "Me".
+  and their turns. MacParakeet assigns its own words to those turns with the
+  built-in merge rules. In a meeting this covers microphone and system words
+  alike; speakers are stored as `external:<id>`, and a word no turn covers
+  keeps its source (`microphone` as "Me", `system` as "Unattributed").
 - A speaker the tool already knows by name (a voice-library match or an
-  earlier naming) keeps that name. Other speakers are numbered as usual
-  ("Others N" in meetings, "Speaker N" in files).
+  earlier naming) keeps that name. Other speakers are "Speaker N".
 - With the external command selected, the built-in speaker models are not
   prepared or downloaded.
 - The paraspeakrs preset runs `paraspeakrs agent diarize`, which runs no ASR.

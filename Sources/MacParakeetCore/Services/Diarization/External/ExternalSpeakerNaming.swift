@@ -44,10 +44,10 @@ public struct ExternalSpeakerNaming: Sendable, Equatable {
     public let outputFolder: URL
     public let speakers: [Speaker]
 
-    /// A transcript stores a detector speaker under the detector's ID, or as
-    /// `system:<ID>` in a meeting, where only the system side is diarized.
+    /// A transcript stores a detector speaker under the detector's ID (file
+    /// transcriptions) or as `external:<ID>` (meetings).
     static func transcriptIDCandidates(for externalID: String) -> [String] {
-        [externalID, AudioSource.system.rawValue + ":" + externalID]
+        [externalID, ExternalSpeakerDetectionLocation.wholeMeetingIDPrefix + externalID]
     }
 
     public func speaker(forTranscriptID id: String) -> Speaker? {

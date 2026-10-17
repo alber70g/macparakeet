@@ -1644,7 +1644,9 @@ off.
   and a time limit. The Capture tab's "Speaker detection" toggles still turn
   detection on or off for meetings and for file and URL transcriptions, and
   name the external command when it is selected.
-- Meetings send the system side; the microphone stays "Me". File and URL
+- Meetings send the whole playback (microphone and system audio as the two
+  stereo sides), so people in the same room are told apart too; a word no
+  speaker turn covers stays "Me" or "Unattributed". File and URL
   transcriptions send the whole audio.
 - A speaker the tool recognizes keeps its name. The speaker overview offers
   **Play sample**, **Confirm** for an unconfirmed voice-library suggestion

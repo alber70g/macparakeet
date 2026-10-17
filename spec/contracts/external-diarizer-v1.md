@@ -43,7 +43,7 @@ empty stdin. Values arrive only as environment variables:
 
 | Variable | Detect | Apply |
 | --- | --- | --- |
-| `MACPARAKEET_AUDIO` | WAV to diarize: a meeting's system side, or a file transcription's converted audio. Temporary; deleted after the run. | — |
+| `MACPARAKEET_AUDIO` | Meetings: `<meeting folder>/meeting-playback.m4a`, the whole meeting in stereo (microphone on one side, system audio on the other), on the transcript's timeline. File transcriptions: the converted WAV, temporary and deleted after the run. | — |
 | `MACPARAKEET_OUT_DIR` | New, empty output folder (below) | Same folder |
 | `MACPARAKEET_TRANSCRIPTION_ID` | Transcription UUID (absent for runs without a saved transcription) | Transcription UUID |
 
@@ -91,10 +91,12 @@ ignored.
 | `speakers[].excluded` | no | `true` leaves the speaker and their turns out. |
 | `turns[]` | yes | `speaker`, `start`, `end`. A turn of an unlisted or excluded speaker is ignored. Turns may overlap. |
 
-MacParakeet assigns its own words to turns with the built-in merge rules.
-Speakers without turns are left out. A speaker with a `label` keeps it; others
-are numbered ("Others N" in meetings, where IDs are stored as
-`system:<id>`; "Speaker N" in file transcriptions).
+MacParakeet assigns its own words to turns with the built-in merge rules. In
+a meeting that covers microphone and system words alike; IDs are stored as
+`external:<id>`, and a word no turn covers keeps its source id (`microphone`,
+shown as "Me", or `system`, shown as "Unattributed"). File transcriptions
+store the IDs unchanged. Speakers without turns are left out. A speaker with
+a `label` keeps it; others are "Speaker N".
 
 ## Sample files and write-back
 
