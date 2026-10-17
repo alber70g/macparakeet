@@ -96,6 +96,9 @@ source "$ROOT_DIR/scripts/dev/stop_app_processes.sh"
 stop_app_processes 10 "$ROOT_DIR" "$APP_BIN" "$APP_MACOS_BIN"
 
 echo "[2/5] Building $CONFIG app bundle (xcodebuild, target signing disabled)…"
+# xcodebuild builds the package in the current directory. Run from another
+# checkout, it would build that checkout's code into this worktree's bundle.
+cd "$ROOT_DIR"
 if ! xcodebuild build \
   -scheme MacParakeet \
   -configuration "$CONFIG" \
